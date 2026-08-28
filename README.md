@@ -1,3 +1,2 @@
 requirements.txt
-Flask
-gunicorn
+Flask guicorn
