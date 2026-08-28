@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email Investigation Report Management System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="bg-aurora" aria-hidden="true">
+    <span class="orb orb-a"></span>
+    <span class="orb orb-b"></span>
+    <span class="orb orb-c"></span>
+    <span class="grid-floor"></span>
+  </div>
+
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark">
+        <span class="brand-mark-face brand-mark-front">E</span>
+        <span class="brand-mark-face brand-mark-back">IRMS</span>
+      </div>
+      <div class="brand-text">
+        <h1>Email Investigation Report Management System</h1>
+        <p class="brand-sub">
+          Consolidated subscriber, device, IP activity &amp; phone-association analysis
+        </p>
+      </div>
+    </div>
+    <div class="brand-meta">
+      <a class="tool-link" href="/kyc-intelligence">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/>
+        </svg>
+        <span>KYC Intelligence</span>
+      </a>
+      <span class="pill">Web UI</span>
+      <span class="pill pill-ghost">v2.0</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Step 1: Upload -->
+    <section class="card" id="upload-card">
+      <div class="card-header">
+        <span class="step-badge">1</span>
+        <h2>Upload Source ZIP</h2>
+      </div>
+      <p class="card-help">
+        Provide the Google export ZIP archive. Nested ZIPs are extracted
+        automatically.
+      </p>
+
+      <form id="upload-form" autocomplete="off">
+        <label class="drop-zone" id="drop-zone" for="zipfile">
+          <input
+            type="file"
+            id="zipfile"
+            name="zipfile"
+            accept=".zip,application/zip,application/x-zip-compressed"
+            required
+          />
+          <div class="drop-zone-inner">
+            <svg
+              class="drop-icon"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            <div class="drop-text">
+              <strong>Click to choose</strong> or drag &amp; drop a ZIP file
+            </div>
+            <div class="drop-sub" id="file-info">
+              No file selected
+            </div>
+            <div class="drop-limit">
+              Maximum upload size: {{ max_upload_mb }}&nbsp;MB
+            </div>
+          </div>
+        </label>
+
+        <div class="form-row">
+          <label for="caseref">Case reference (optional)</label>
+          <input
+            type="text"
+            id="caseref"
+            name="caseref"
+            placeholder="e.g. FIR No. 145/2025 / U/s 66 IT Act"
+            maxlength="120"
+          />
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn primary" id="submit-btn">
+            <span class="btn-label">Generate Report</span>
+            <span class="btn-spinner" aria-hidden="true"></span>
+          </button>
+        </div>
+
+        <div class="config-banner" id="ipinfo-banner" data-configured="{{ '1' if ipinfo_configured else '0' }}">
+          {% if ipinfo_configured %}
+          <span class="config-dot ok"></span>
+          <span class="config-text">IP geolocation enabled (ipinfo.io token loaded).</span>
+          {% else %}
+          <span class="config-dot warn"></span>
+          <span class="config-text">IP geolocation disabled &mdash; set <code>IPINFO_TOKEN</code> environment variable to enable the IP&nbsp;Geolocation&nbsp;Lookup output.</span>
+          {% endif %}
+        </div>
+      </form>
+    </section>
+
+    <!-- Step 2: Progress -->
+    <section class="card hidden" id="progress-card">
+      <div class="card-header">
+        <span class="step-badge">2</span>
+        <h2>Processing</h2>
+        <span class="status-pill" id="status-pill">pending</span>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-track">
+          <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="progress-meta">
+          <span id="progress-stage">Waiting&hellip;</span>
+          <span id="progress-counter">0 / 0</span>
+        </div>
+      </div>
+
+      <details class="log-details" open>
+        <summary>Live log</summary>
+        <pre id="log-output" class="log-output"></pre>
+      </details>
+    </section>
+
+    <!-- Step 3: Results -->
+    <section class="card hidden" id="result-card">
+      <div class="card-header">
+        <span class="step-badge">3</span>
+        <h2>Report Ready</h2>
+      </div>
+
+      <p class="card-help">
+        The investigation report has been generated successfully.
+        All seven output files are available below.
+      </p>
+
+      <div class="stats-grid" id="stats-grid"></div>
+
+      <div class="download-grid" id="download-grid">
+        {% for entry in output_files %}
+        <button
+          type="button"
+          class="btn download"
+          data-file-type="{{ entry.type }}"
+        >
+          {% if entry.icon == 'spreadsheet' %}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="3" y1="9" x2="21" y2="9" />
+            <line x1="3" y1="15" x2="21" y2="15" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+            <line x1="15" y1="3" x2="15" y2="21" />
+          </svg>
+          {% elif entry.icon == 'table' %}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v18" />
+            <rect x="3" y="5" width="18" height="14" rx="1" />
+            <path d="M3 9h18" />
+          </svg>
+          {% elif entry.icon == 'text' %}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="8" y1="13" x2="16" y2="13" />
+          </svg>
+          {% else %}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="8" y1="13" x2="16" y2="13" />
+            <line x1="8" y1="17" x2="16" y2="17" />
+            <line x1="8" y1="9" x2="10" y2="9" />
+          </svg>
+          {% endif %}
+          <span class="dl-label">
+            <strong>{{ entry.label }}</strong>
+            <small data-file-type="{{ entry.type }}">{{ entry.subtitle }}</small>
+          </span>
+        </button>
+        {% endfor %}
+      </div>
+
+      <div class="actions secondary-actions">
+        <button type="button" class="btn ghost" id="new-job-btn">
+          Process another ZIP
+        </button>
+      </div>
+    </section>
+
+    <!-- Error banner -->
+    <section class="card error-card hidden" id="error-card">
+      <div class="card-header">
+        <span class="step-badge error">!</span>
+        <h2>Something went wrong</h2>
+      </div>
+      <p class="error-text" id="error-text"></p>
+      <details class="log-details">
+        <summary>Show technical details</summary>
+        <pre id="error-log" class="log-output"></pre>
+      </details>
+      <div class="actions">
+        <button type="button" class="btn ghost" id="error-dismiss">
+          Try again
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <span>Local investigator tool &mdash; files are processed on this server.</span>
+  </footer>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

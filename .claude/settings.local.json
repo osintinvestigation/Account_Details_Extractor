@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la \"D:/Account_Details_Extractor.html\" 2>&1 | head -5)",
+      "Bash(cp \"D:/Account_Details_Extractor.html\" \"C:/Users/Hackthebox/SpaceByteBot/Account_Details_Extractor.html\" && ls -la \"C:/Users/Hackthebox/SpaceByteBot/Account_Details_Extractor.html\")"
+    ]
+  }
+}

@@ -1,0 +1,2819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TraceOps — Bank KYC Intelligence Platform</title>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --bg-deep: #0a0e27;
+    --bg-panel: rgba(10, 20, 50, 0.55);
+    --line: rgba(0, 240, 255, 0.25);
+    --text: #e0f7ff;
+    --text-dim: #7aa3c2;
+    --cyan: #00f0ff;
+    --magenta: #ff00aa;
+    --mint: #00ff88;
+    --amber: #facc15;
+    --orange: #ff7a00;
+    --red: #ff2d6f;
+    --risk-low: var(--mint);
+    --risk-med: var(--amber);
+    --risk-high: var(--orange);
+    --risk-critical: var(--red);
+    --font-mono: ui-monospace, "JetBrains Mono", "Fira Code", "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { color-scheme: dark; }
+  body {
+    font-family: var(--font-mono);
+    margin: 0;
+    padding: 14px 18px;
+    background: transparent;
+    color: var(--text);
+    min-height: 100vh;
+  }
+  #bg3d { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+  .container {
+    max-width: 1400px; margin: 0 auto;
+    background: linear-gradient(180deg, rgba(10,14,39,0.6), rgba(10,14,39,0.85));
+    border-radius: 12px; padding: 16px 20px;
+    box-shadow: 0 0 60px rgba(0, 240, 255, 0.08), inset 0 0 30px rgba(0, 240, 255, 0.04);
+  }
+  h1 {
+    margin: 0 0 6px; font-size: 26px; color: var(--cyan);
+    text-transform: uppercase; letter-spacing: 6px;
+    text-shadow: 0 0 8px var(--cyan), 0 0 24px rgba(0,240,255,0.4);
+    position: relative; display: inline-block;
+  }
+  h1::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 2px;
+    background: linear-gradient(90deg, var(--cyan), var(--magenta), var(--cyan));
+    background-size: 200% 100%;
+    animation: border-shift 4s linear infinite;
+  }
+  @keyframes border-shift { 0%{background-position:0% 0;} 100%{background-position:200% 0;} }
+  .subtitle { color: var(--text-dim); margin-bottom: 14px; font-size: 12px; letter-spacing: 0.5px; }
+  .upload-bar {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 14px; flex-wrap: wrap;
+  }
+  #uploadBtn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 20px; font-size: 13px;
+    background: rgba(0, 240, 255, 0.18);
+    border: 1px solid var(--cyan);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+    text-transform: uppercase; letter-spacing: 1.5px;
+  }
+  #uploadBtn:hover {
+    background: rgba(0, 240, 255, 0.32);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.6), 0 0 30px rgba(255, 0, 170, 0.2);
+    transform: translateY(-1px);
+  }
+  #uploadBtn .upload-icon {
+    font-size: 16px; color: var(--cyan); margin: 0;
+    text-shadow: 0 0 8px var(--cyan);
+  }
+  #uploadBtn .upload-label { color: var(--cyan); }
+  .upload-hint {
+    color: var(--text-dim); font-size: 11px; letter-spacing: 0.5px;
+  }
+  input[type="file"] { display: none; }
+
+  .controls { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  button {
+    background: rgba(0, 240, 255, 0.12); color: var(--cyan); border: 1px solid var(--cyan);
+    padding: 7px 14px; border-radius: 5px; font-size: 12px;
+    font-weight: 500; cursor: pointer; transition: all 0.2s;
+    font-family: var(--font-mono); letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  button:hover:not(:disabled) {
+    background: rgba(0, 240, 255, 0.22); color: #fff;
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
+    transform: translateY(-1px);
+  }
+  button:disabled { background: rgba(122, 163, 194, 0.1); border-color: var(--text-dim); color: var(--text-dim); cursor: not-allowed; }
+  button.secondary { background: rgba(122, 163, 194, 0.12); border-color: var(--text-dim); color: var(--text-dim); }
+  button.secondary:hover:not(:disabled) { background: rgba(122, 163, 194, 0.22); color: #fff; box-shadow: 0 0 12px rgba(122,163,194,0.4); }
+  button.success { background: rgba(0, 255, 136, 0.12); border-color: var(--mint); color: var(--mint); }
+  button.success:hover:not(:disabled) { background: rgba(0, 255, 136, 0.22); color: #fff; box-shadow: 0 0 12px rgba(0,255,136,0.5); }
+  button.magenta { background: rgba(255, 0, 170, 0.12); border-color: var(--magenta); color: var(--magenta); }
+  button.magenta:hover:not(:disabled) { background: rgba(255, 0, 170, 0.22); color: #fff; box-shadow: 0 0 12px rgba(255,0,170,0.5); }
+  button.primary { background: rgba(0, 240, 255, 0.18); border-color: var(--cyan); color: var(--cyan); font-weight: 600; }
+
+  .progress-bar {
+    width: 100%; height: 5px; background: rgba(0, 240, 255, 0.08); border-radius: 3px;
+    overflow: hidden; margin-bottom: 10px; display: none;
+    border: 1px solid rgba(0, 240, 255, 0.15);
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan), var(--magenta));
+    transition: width 0.3s; width: 0%;
+    box-shadow: 0 0 8px var(--cyan);
+  }
+
+  .status {
+    background: var(--bg-panel); padding: 8px 12px; border-radius: 6px;
+    margin-bottom: 10px; border-left: 3px solid var(--cyan); font-size: 12px; display: none;
+    color: var(--text); backdrop-filter: blur(8px);
+    font-family: var(--font-mono);
+  }
+  .status::before {
+    content: "> "; color: var(--cyan);
+    animation: terminal-blink 1s steps(2) infinite;
+  }
+  @keyframes terminal-blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0.3; } }
+  .status.error { border-left-color: var(--red); }
+  .status.error::before { content: "✗ "; color: var(--red); animation: none; }
+  .status.success { border-left-color: var(--mint); }
+  .status.success::before { content: "✓ "; color: var(--mint); animation: none; }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 8px; margin-bottom: 10px; display: none;
+  }
+  .stat-card {
+    background: var(--bg-panel); padding: 10px 12px; border-radius: 6px;
+    border-left: 3px solid var(--cyan); backdrop-filter: blur(8px);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .stat-card:hover { transform: perspective(900px) rotateY(4deg) translateZ(0); box-shadow: 0 0 18px rgba(0,240,255,0.25); }
+  .stat-card.errors { border-left-color: var(--red); }
+  .stat-card .label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+  .stat-card .value { font-size: 20px; font-weight: 600; color: var(--cyan); margin-top: 2px; text-shadow: 0 0 8px rgba(0,240,255,0.3); }
+
+  table {
+    width: 100%; border-collapse: collapse;
+    background: var(--bg-panel); border-radius: 8px; overflow: hidden;
+    box-shadow: 0 0 24px rgba(0, 240, 255, 0.06); font-size: 13px;
+    backdrop-filter: blur(6px);
+  }
+  th {
+    background: rgba(0, 240, 255, 0.12); color: var(--cyan);
+    padding: 8px 8px; text-align: left; font-weight: 600;
+    position: sticky; top: 0; z-index: 10;
+    text-transform: uppercase; letter-spacing: 1px; font-size: 10px;
+    border-bottom: 1px solid var(--cyan);
+    text-shadow: 0 0 6px rgba(0, 240, 255, 0.4);
+  }
+  td {
+    padding: 6px 8px; border-bottom: 1px solid rgba(0, 240, 255, 0.08);
+    vertical-align: middle; color: var(--text);
+  }
+  tr:hover {
+    background: rgba(0, 240, 255, 0.05);
+    transform: perspective(800px) rotateX(0.5deg);
+    box-shadow: inset 0 0 12px rgba(0, 240, 255, 0.08);
+  }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover { background: rgba(0, 240, 255, 0.1); }
+  tr.row-expanded td {
+    background: rgba(0, 240, 255, 0.04);
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--cyan);
+  }
+  .expanded-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 12px; }
+  .expanded-panel h4 { margin: 0 0 8px; color: var(--cyan); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  .expanded-panel ul { margin: 0; padding-left: 16px; color: var(--text); }
+  .expanded-panel li { margin-bottom: 4px; }
+  .expanded-panel .weight { color: var(--amber); font-weight: 600; }
+  .photo-cell { width: 90px; }
+  .photo-cell img {
+    width: 70px; height: 70px; object-fit: cover;
+    border-radius: 4px; border: 1px solid var(--cyan);
+    display: block; box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+  }
+  .photo-placeholder {
+    width: 70px; height: 70px; background: rgba(0, 240, 255, 0.05); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim); font-size: 11px; border: 1px dashed var(--text-dim);
+  }
+  .table-wrapper { overflow-x: auto; max-height: 500px; overflow-y: auto; }
+  .empty {
+    text-align: center; padding: 18px; color: var(--text-dim);
+    background: var(--bg-panel); border-radius: 6px; border: 1px dashed var(--text-dim);
+    font-size: 12px;
+  }
+  .small { font-size: 11px; color: var(--text-dim); }
+
+  .search-bar {
+    background: var(--bg-panel); border-radius: 6px; padding: 10px 12px;
+    margin-bottom: 10px; backdrop-filter: blur(8px);
+    display: none; border: 1px solid rgba(0, 240, 255, 0.15);
+  }
+  .search-bar h3 {
+    margin: 0 0 6px; font-size: 12px; color: var(--cyan);
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .search-input-group { display: flex; gap: 6px; align-items: center; }
+  .search-input-group input {
+    flex: 1; padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 5px; font-size: 13px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none; color: var(--text); font-family: var(--font-mono);
+  }
+  .search-input-group input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 2px rgba(0, 240, 255, 0.25), 0 0 18px rgba(0, 240, 255, 0.2) inset;
+  }
+  .search-info {
+    margin-top: 6px; font-size: 11px; color: var(--text-dim);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .search-info .count { font-weight: 600; color: var(--cyan); }
+  .search-info .clear-search {
+    background: none; border: none; color: var(--text-dim);
+    cursor: pointer; font-size: 11px; padding: 2px 6px;
+    font-family: var(--font-mono); text-transform: uppercase;
+  }
+  .search-info .clear-search:hover { color: var(--cyan); background: rgba(0, 240, 255, 0.08); border-radius: 4px; }
+  .search-suggestions { margin-top: 6px; font-size: 10px; color: var(--text-dim); }
+  .search-suggestions .chip {
+    display: inline-block; padding: 1px 6px; margin: 1px 3px 1px 0;
+    background: rgba(0, 240, 255, 0.08); border-radius: 10px;
+    font-size: 10px; color: var(--cyan);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+  }
+  .no-results {
+    text-align: center; padding: 20px; color: var(--text-dim);
+    background: var(--bg-panel); border-radius: 6px;
+    border: 1px dashed rgba(255, 45, 111, 0.4);
+  }
+  .no-results strong { color: var(--red); }
+
+  /* ========== ML PANEL ========== */
+  .ml-panel {
+    background: var(--bg-panel); border: 1px solid rgba(0, 240, 255, 0.2);
+    border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;
+    backdrop-filter: blur(10px); display: none;
+    box-shadow: 0 0 24px rgba(0, 240, 255, 0.08);
+  }
+  .ml-panel__head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .ml-panel__head h2 {
+    margin: 0; font-size: 12px; color: var(--cyan);
+    text-transform: uppercase; letter-spacing: 2px;
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+  }
+  .ml-tiles {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+  }
+  .ml-tile {
+    background: rgba(0, 240, 255, 0.04);
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    border-radius: 5px; padding: 8px 10px;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .ml-tile:hover {
+    transform: perspective(900px) rotateY(6deg) translateZ(0);
+    box-shadow: 0 0 14px rgba(0, 240, 255, 0.3);
+  }
+  .ml-tile .label {
+    font-size: 9px; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .ml-tile .value {
+    font-size: 18px; font-weight: 600; color: var(--cyan);
+    margin-top: 2px; text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+  }
+
+  /* ========== RISK BADGES ========== */
+  .risk-badge {
+    display: inline-block; padding: 2px 10px; border-radius: 12px;
+    font-size: 10px; font-weight: 600; letter-spacing: 1px;
+    text-transform: uppercase; font-family: var(--font-mono);
+    border: 1px solid currentColor; background: rgba(0, 0, 0, 0.3);
+  }
+  .risk-badge--LOW { color: var(--risk-low); box-shadow: 0 0 8px rgba(0, 255, 136, 0.3); }
+  .risk-badge--MEDIUM { color: var(--risk-med); box-shadow: 0 0 8px rgba(250, 204, 21, 0.3); }
+  .risk-badge--HIGH { color: var(--risk-high); box-shadow: 0 0 8px rgba(255, 122, 0, 0.3); }
+  .risk-badge--CRITICAL { color: var(--risk-critical); box-shadow: 0 0 10px rgba(255, 45, 111, 0.5); animation: pulse-glow 1.5s ease-in-out infinite; }
+  .risk-badge--NA { color: var(--text-dim); }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 10px rgba(255, 45, 111, 0.5); }
+    50% { box-shadow: 0 0 18px rgba(255, 45, 111, 0.9); }
+  }
+
+  /* ========== LOADING RING ========== */
+  .loading-ring {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid rgba(0, 240, 255, 0.2);
+    border-top-color: var(--cyan); border-radius: 50%;
+    animation: spin 0.9s linear infinite; vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+  /* ========== ROW-EXPANDED ANIMATION ========== */
+  tr.row-expanded { animation: slide-in-row 0.25s ease-out; }
+  @keyframes slide-in-row {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ========== REDUCED MOTION ========== */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+
+  /* ========== IRMS NAVIGATION BAR ========== */
+  .irms-nav {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 10px 18px;
+    margin: -14px -18px 14px -18px;
+    background: rgba(10, 14, 39, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(0, 240, 255, 0.25);
+    box-shadow: 0 0 18px rgba(0, 240, 255, 0.12);
+    font-family: var(--font-mono);
+  }
+  .irms-nav__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--cyan);
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    font-size: 12px;
+    text-shadow: 0 0 8px rgba(0, 240, 255, 0.45);
+  }
+  .irms-nav__brand .pulse-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 10px var(--mint);
+    animation: dot-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes dot-pulse {
+    0%, 100% { box-shadow: 0 0 6px var(--mint); }
+    50%      { box-shadow: 0 0 14px var(--mint), 0 0 22px rgba(0,255,136,0.4); }
+  }
+  .irms-nav__links {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .irms-nav__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-decoration: none;
+    color: var(--text-dim);
+    border: 1px solid transparent;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+  }
+  .irms-nav__link:hover {
+    color: var(--cyan);
+    border-color: rgba(0, 240, 255, 0.4);
+    background: rgba(0, 240, 255, 0.08);
+    text-shadow: 0 0 6px rgba(0, 240, 255, 0.4);
+  }
+  .irms-nav__link.active {
+    color: var(--cyan);
+    border-color: var(--cyan);
+    background: rgba(0, 240, 255, 0.12);
+    text-shadow: 0 0 8px var(--cyan);
+  }
+  .irms-nav__link svg {
+    width: 12px; height: 12px;
+  }
+  @media (max-width: 640px) {
+    .irms-nav__brand span.irms-nav__label { display: none; }
+    .irms-nav__link span.link-label { display: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="bg3d"></canvas>
+
+<nav class="irms-nav" aria-label="IRMS navigation">
+  <a class="irms-nav__brand" href="/">
+    <span class="pulse-dot" aria-hidden="true"></span>
+    <span class="irms-nav__label">IRMS · Email Investigation Toolkit</span>
+  </a>
+  <div class="irms-nav__links">
+    <a class="irms-nav__link" href="/">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+      <span class="link-label">Google Investigation</span>
+    </a>
+    <a class="irms-nav__link active" href="/kyc-intelligence">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/></svg>
+      <span class="link-label">KYC Intelligence</span>
+    </a>
+  </div>
+</nav>
+<div class="container">
+  <h1>TraceOps</h1>
+  <p class="subtitle">Open-source intelligence for banking KYC documents. Drop ZIP files containing CSVs and KYC PDFs — entities are extracted, scored, and clustered entirely in your browser. Files never leave your computer.</p>
+
+  <div class="upload-bar">
+    <button id="uploadBtn" class="primary">
+      <span class="upload-icon">📁</span>
+      <span class="upload-label">Upload ZIP Files</span>
+    </button>
+    <input type="file" id="fileInput" multiple accept=".zip">
+    <span class="upload-hint">Supports multiple archives (IDFC, Bandhan, Axis, DBS, etc.)</span>
+  </div>
+
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div class="stats" id="stats">
+    <div class="stat-card">
+      <div class="label">Archives Processed</div>
+      <div class="value" id="statFiles">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Entities Profiled</div>
+      <div class="value" id="statRecords">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Photos Captured</div>
+      <div class="value" id="statPhotos">0</div>
+    </div>
+    <div class="stat-card errors">
+      <div class="label">Errors</div>
+      <div class="value" id="statErrors">0</div>
+    </div>
+  </div>
+
+  <div class="ml-panel" id="mlPanel">
+    <div class="ml-panel__head">
+      <h2>◆ ML Intelligence</h2>
+      <button class="primary" id="runAnalysis">Run Analysis</button>
+    </div>
+    <div class="ml-tiles">
+      <div class="ml-tile"><div class="label">Avg Risk</div><div class="value" id="mlAvgRisk">—</div></div>
+      <div class="ml-tile"><div class="label">High-Risk</div><div class="value" id="mlHighRisk">—</div></div>
+      <div class="ml-tile"><div class="label">Anomalies</div><div class="value" id="mlAnomalies">—</div></div>
+      <div class="ml-tile"><div class="label">Duplicate Groups</div><div class="value" id="mlDupes">—</div></div>
+      <div class="ml-tile"><div class="label">Pattern Clusters</div><div class="value" id="mlPatterns">—</div></div>
+    </div>
+  </div>
+
+  <div class="search-bar" id="searchBar">
+    <h3>🔍 Search Records</h3>
+    <div class="search-input-group">
+      <input type="text" id="searchInput" placeholder="Enter Account No., Phone No., or Email ID to search..." autocomplete="off">
+      <button class="success" id="searchBtn">Search</button>
+    </div>
+    <div class="search-info" id="searchInfo" style="display:none;">
+      <span>Showing <span class="count" id="searchCount">0</span> of <span id="totalCount">0</span> records</span>
+      <button class="clear-search" id="clearSearchBtn">✕ Clear search</button>
+    </div>
+    <div class="search-suggestions">
+      Try searching by:
+      <span class="chip">Account No.</span>
+      <span class="chip">Phone No.</span>
+      <span class="chip">Email ID</span>
+      <span class="chip">PAN Card No.</span>
+    </div>
+  </div>
+
+  <div class="controls" id="controls" style="display:none;">
+    <button class="success" id="exportXlsx">📥 Export Intelligence (XLSX)</button>
+    <button class="success" id="exportCsv">📥 Export Entities (CSV)</button>
+    <button class="success" id="exportJson">📥 Export Entities (JSON)</button>
+    <button class="magenta" id="exportPdf">📥 Export Risk Report (PDF)</button>
+    <button class="secondary" id="clearBtn">🗑 Purge</button>
+  </div>
+
+  <div id="results">
+    <div class="empty">No entities indexed. Upload archives to begin reconnaissance.</div>
+  </div>
+</div>
+
+<script>
+// ========== THREE.JS 3D BACKGROUND ==========
+function initThreeBackground() {
+  if (typeof THREE === 'undefined') {
+    console.warn('Three.js not loaded, skipping 3D background.');
+    return;
+  }
+  const canvas = document.getElementById('bg3d');
+  if (!canvas) return;
+
+  // Honor reduced-motion preference: render one static frame, then stop.
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0a0e27, 0.0008);
+
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+  camera.position.set(0, 60, 220);
+  camera.lookAt(0, 0, 0);
+
+  // Layer 1 — floor grid
+  const floorGrid = new THREE.GridHelper(800, 60, 0x00f0ff, 0x102a4a);
+  floorGrid.rotation.x = -Math.PI / 2;
+  floorGrid.position.y = -60;
+  scene.add(floorGrid);
+
+  // Layer 2 — wireframe globe + halo
+  const globeGeo = new THREE.IcosahedronGeometry(40, 2);
+  const globeMat = new THREE.MeshBasicMaterial({
+    color: 0x00f0ff, wireframe: true, transparent: true, opacity: 0.35
+  });
+  const globe = new THREE.Mesh(globeGeo, globeMat);
+  scene.add(globe);
+
+  const haloGeo = new THREE.IcosahedronGeometry(42, 1);
+  const haloMat = new THREE.MeshBasicMaterial({
+    color: 0xff00aa, wireframe: true, transparent: true, opacity: 0.15
+  });
+  const halo = new THREE.Mesh(haloGeo, haloMat);
+  scene.add(halo);
+
+  // Layer 3 — particle field
+  const particleCount = 1500;
+  const positions = new Float32Array(particleCount * 3);
+  for (let i = 0; i < particleCount; i++) {
+    positions[i * 3 + 0] = (Math.random() - 0.5) * 800;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 400;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 800;
+  }
+  const particleGeo = new THREE.BufferGeometry();
+  particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const particleMat = new THREE.PointsMaterial({
+    color: 0x00ff88, size: 0.6, transparent: true, opacity: 0.7,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const particles = new THREE.Points(particleGeo, particleMat);
+  scene.add(particles);
+
+  // Layer 4 — orbiting satellite nodes
+  const satellites = new THREE.Group();
+  for (let i = 0; i < 12; i++) {
+    const nodeGeo = new THREE.OctahedronGeometry(1.5, 0);
+    const nodeMat = new THREE.MeshBasicMaterial({
+      color: i % 2 === 0 ? 0x00f0ff : 0xff00aa,
+      wireframe: true, transparent: true, opacity: 0.7
+    });
+    const node = new THREE.Mesh(nodeGeo, nodeMat);
+    const angle = (i / 12) * Math.PI * 2;
+    node.userData = { angle, radius: 60 + Math.random() * 10, speed: 0.0005 + Math.random() * 0.0005, tilt: (Math.random() - 0.5) * 0.4 };
+    satellites.add(node);
+  }
+  scene.add(satellites);
+
+  // Layer 5 — AI cyber-criminal silhouettes walking inside the globe.
+  // Each humanoid is a low-poly stick figure (head + torso + 2 arms + 2 legs)
+  // that wanders along the inside surface of the wireframe globe.
+  const GLOBE_RADIUS = 40;
+  const HUMANOID_COUNT = 6;
+  const humanoids = [];
+
+  // Build a single reusable humanoid skeleton (parts grouped under a root
+  // Object3D so we can transform the whole figure via .position/.rotation).
+  function buildHumanoid(color) {
+    const root = new THREE.Group();
+    const matSolid = new THREE.MeshBasicMaterial({
+      color, wireframe: false, transparent: true, opacity: 0.85
+    });
+    const matGlow = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff, wireframe: true, transparent: true, opacity: 0.9
+    });
+    // Head
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.6), matSolid);
+    head.position.y = 4.0;
+    root.add(head);
+    // Cyan visor band (cyber-criminal aesthetic)
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.4, 1.7), matGlow);
+    visor.position.y = 4.0;
+    root.add(visor);
+    // Torso
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.0, 1.2), matSolid);
+    torso.position.y = 1.7;
+    root.add(torso);
+    // Left arm (will swing)
+    const armL = new THREE.Mesh(new THREE.BoxGeometry(0.6, 2.4, 0.6), matSolid);
+    armL.position.set(-1.4, 1.6, 0);
+    root.add(armL);
+    // Right arm
+    const armR = new THREE.Mesh(new THREE.BoxGeometry(0.6, 2.4, 0.6), matSolid);
+    armR.position.set(1.4, 1.6, 0);
+    root.add(armR);
+    // Left leg (will swing)
+    const legL = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.4, 0.7), matSolid);
+    legL.position.set(-0.55, -1.0, 0);
+    root.add(legL);
+    // Right leg
+    const legR = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.4, 0.7), matSolid);
+    legR.position.set(0.55, -1.0, 0);
+    root.add(legR);
+    // Aura ring (subtle ground shadow)
+    const aura = new THREE.Mesh(
+      new THREE.RingGeometry(2.5, 3.2, 16),
+      new THREE.MeshBasicMaterial({ color: 0xff00aa, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
+    );
+    aura.rotation.x = -Math.PI / 2;
+    aura.position.y = -2.3;
+    root.add(aura);
+
+    return { root, head, visor, torso, armL, armR, legL, legR, aura };
+  }
+
+  const humanoidColors = [0xff00aa, 0x00f0ff, 0xff2d6f, 0xfacc15, 0x00ff88, 0xff7a00];
+  for (let i = 0; i < HUMANOID_COUNT; i++) {
+    const h = buildHumanoid(humanoidColors[i % humanoidColors.length]);
+    // Pick a random starting position on the inside surface of the globe.
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = GLOBE_RADIUS - 4; // walk slightly inside the wireframe
+    h.root.position.set(
+      r * Math.sin(phi) * Math.cos(theta),
+      r * Math.cos(phi) * 0.5,           // squash vertical so they walk on a "floor" inside the sphere
+      r * Math.sin(phi) * Math.sin(theta)
+    );
+    // Per-humanoid wandering state
+    h.root.userData = {
+      theta,
+      phi,
+      radius: r,
+      walkSpeed: 0.5 + Math.random() * 0.8,        // rad/s around the globe
+      verticalWander: 0.0005 + Math.random() * 0.001,
+      phase: Math.random() * Math.PI * 2,          // for leg-swing offset
+      facingTarget: new THREE.Vector3(),
+      hopPhase: Math.random() * Math.PI * 2
+    };
+    humanoids.push(h);
+    scene.add(h.root);
+  }
+
+  // Animation state
+  let rafId = null;
+  let lastFrame = 0;
+  const FPS_CAP = 33; // ~30 fps
+
+  function loop(now) {
+    rafId = requestAnimationFrame(loop);
+    if (now - lastFrame < FPS_CAP) return;
+    lastFrame = now;
+
+    const t = now * 0.001;
+
+    globe.rotation.y += 0.0012;
+    globe.rotation.x += 0.0004;
+    halo.rotation.y -= 0.0008;
+    particles.rotation.y += 0.0003;
+    floorGrid.rotation.z += 0.0008;
+
+    // Parallax camera
+    camera.position.x = Math.sin(t * 0.2) * 10;
+    camera.position.y = 60 + Math.sin(t * 0.3) * 4;
+    camera.lookAt(0, 0, 0);
+
+    // Update satellites
+    satellites.children.forEach(node => {
+      node.userData.angle += node.userData.speed;
+      const a = node.userData.angle;
+      const r = node.userData.radius;
+      node.position.set(
+        Math.cos(a) * r,
+        Math.sin(a * 2) * 8 + node.userData.tilt * 30,
+        Math.sin(a) * r
+      );
+    });
+
+    // Update humanoids — wander along inside surface + walk-cycle
+    humanoids.forEach((h) => {
+      const ud = h.root.userData;
+      ud.theta += ud.walkSpeed * (1 / 60);
+      // Slowly oscillate phi so they wander up/down the inside of the sphere
+      ud.phi += Math.sin(t * 0.7 + ud.phase) * ud.verticalWander;
+      // Clamp phi to keep them in the visible upper hemisphere mostly
+      ud.phi = Math.max(0.4, Math.min(Math.PI - 0.4, ud.phi));
+      const r = ud.radius;
+      const px = r * Math.sin(ud.phi) * Math.cos(ud.theta);
+      const py = r * Math.cos(ud.phi) * 0.5;
+      const pz = r * Math.sin(ud.phi) * Math.sin(ud.theta);
+      h.root.position.set(px, py, pz);
+
+      // Face along the direction of travel (tangent to the sphere surface)
+      const nextTheta = ud.theta + 0.01;
+      const nextPhi = ud.phi;
+      const nx = r * Math.sin(nextPhi) * Math.cos(nextTheta);
+      const ny = r * Math.cos(nextPhi) * 0.5;
+      const nz = r * Math.sin(nextPhi) * Math.sin(nextTheta);
+      // Build a basis where +Z faces the direction of motion, +Y points outward (away from globe center)
+      const outward = new THREE.Vector3(px, py, pz).normalize();
+      const forward = new THREE.Vector3(nx - px, ny - py, nz - pz).normalize();
+      const right = new THREE.Vector3().crossVectors(outward, forward).normalize();
+      const adjustedForward = new THREE.Vector3().crossVectors(right, outward).normalize();
+      const m = new THREE.Matrix4();
+      m.makeBasis(right, outward, adjustedForward);
+      h.root.quaternion.setFromRotationMatrix(m);
+
+      // Walk cycle: swing legs and arms
+      const swing = Math.sin(t * 6 + ud.phase) * 0.6;
+      h.legL.rotation.x = swing;
+      h.legR.rotation.x = -swing;
+      h.armL.rotation.x = -swing * 0.7;
+      h.armR.rotation.x = swing * 0.7;
+      // Slight body bob
+      h.torso.position.y = 1.7 + Math.abs(Math.sin(t * 6 + ud.phase)) * 0.15;
+      h.head.position.y = 4.0 + Math.abs(Math.sin(t * 6 + ud.phase)) * 0.15;
+      // Visor flicker (subtle cyber feel)
+      h.visor.material.opacity = 0.7 + Math.sin(t * 4 + ud.phase) * 0.25;
+      // Aura pulse
+      h.aura.material.opacity = 0.4 + Math.sin(t * 3 + ud.phase) * 0.2;
+      h.aura.rotation.z += 0.02;
+    });
+
+    renderer.render(scene, camera);
+  }
+
+  // Resize handler
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // Visibility-based pause/resume
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    } else if (rafId === null) {
+      lastFrame = 0;
+      loop(performance.now());
+    }
+  });
+
+  if (reduceMotion) {
+    renderer.render(scene, camera); // single static frame
+    return;
+  }
+
+  loop(performance.now());
+}
+
+// ========== ML ENGINE (Pure JS) ==========
+const MLEngine = (() => {
+  const STOPWORDS = new Set(['the','and','of','in','at','on','a','an','to','for','with','is','it','this','that','from']);
+
+  function levenshtein(a, b) {
+    if (!a) return (b || '').length;
+    if (!b) return a.length;
+    a = a.substring(0, 200);
+    b = b.substring(0, 200);
+    const m = a.length, n = b.length;
+    if (Math.abs(m - n) > 200) return Math.abs(m - n);
+    let prev = new Array(n + 1);
+    let curr = new Array(n + 1);
+    for (let j = 0; j <= n; j++) prev[j] = j;
+    for (let i = 1; i <= m; i++) {
+      curr[0] = i;
+      for (let j = 1; j <= n; j++) {
+        const cost = a[i-1] === b[j-1] ? 0 : 1;
+        curr[j] = Math.min(prev[j] + 1, curr[j-1] + 1, prev[j-1] + cost);
+      }
+      [prev, curr] = [curr, prev];
+    }
+    return prev[n];
+  }
+
+  function tokenize(s) {
+    if (!s) return [];
+    return String(s).toLowerCase().split(/\W+/).filter(t => t.length > 1 && !STOPWORDS.has(t));
+  }
+
+  function jaccard(a, b) {
+    const setA = new Set(a);
+    const setB = new Set(b);
+    if (setA.size === 0 && setB.size === 0) return 0;
+    let inter = 0;
+    for (const x of setA) if (setB.has(x)) inter++;
+    const union = setA.size + setB.size - inter;
+    return union === 0 ? 0 : inter / union;
+  }
+
+  function normalizeName(s) {
+    if (!s) return '';
+    return String(s).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function meanStd(values) {
+    if (!values.length) return { mean: 0, std: 0 };
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / values.length;
+    return { mean, std: Math.sqrt(variance) };
+  }
+
+  function zScore(values, x) {
+    const { mean, std } = meanStd(values);
+    return std === 0 ? 0 : (x - mean) / std;
+  }
+
+  function iqrBounds(values) {
+    if (values.length < 4) return { lo: -Infinity, hi: Infinity };
+    const sorted = [...values].sort((a, b) => a - b);
+    const q = p => {
+      const idx = (sorted.length - 1) * p;
+      const lo = Math.floor(idx), hi = Math.ceil(idx);
+      return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+    };
+    const q1 = q(0.25), q3 = q(0.75);
+    const iqr = q3 - q1;
+    return { lo: q1 - 1.5 * iqr, hi: q3 + 1.5 * iqr };
+  }
+
+  function freqTable(values) {
+    const m = new Map();
+    for (const v of values) {
+      if (!v) continue;
+      m.set(v, (m.get(v) || 0) + 1);
+    }
+    return m;
+  }
+
+  function buildContext(records) {
+    const ctx = {
+      n: records.length,
+      averages: {},
+      lengthFields: {},
+      domainFreq: new Map(),
+      phonePrefixFreq: new Map(),
+      accountNoFreq: new Map(),
+      panFreq: new Map(),
+      phoneFreq: new Map(),
+      emailFreq: new Map(),
+      recordIdxByAccount: new Map(),
+      recordIdxByPan: new Map(),
+      recordIdxByPhone: new Map(),
+      recordIdxByEmail: new Map()
+    };
+
+    const accLens = [], addrLens = [], emailLens = [];
+    const domains = [], phonePrefixes = [];
+
+    records.forEach((r, idx) => {
+      if (r.account_no) {
+        accLens.push(r.account_no.length);
+        const k = r.account_no.toLowerCase().trim();
+        ctx.accountNoFreq.set(k, (ctx.accountNoFreq.get(k) || 0) + 1);
+        if (!ctx.recordIdxByAccount.has(k)) ctx.recordIdxByAccount.set(k, []);
+        ctx.recordIdxByAccount.get(k).push(idx);
+      }
+      if (r.complete_address) addrLens.push(r.complete_address.length);
+      if (r.email_id) {
+        emailLens.push(r.email_id.length);
+        const at = r.email_id.indexOf('@');
+        if (at > 0) domains.push(r.email_id.substring(at + 1).toLowerCase());
+        const k = r.email_id.toLowerCase().trim();
+        ctx.emailFreq.set(k, (ctx.emailFreq.get(k) || 0) + 1);
+        if (!ctx.recordIdxByEmail.has(k)) ctx.recordIdxByEmail.set(k, []);
+        ctx.recordIdxByEmail.get(k).push(idx);
+      }
+      if (r.phone_no) {
+        phonePrefixes.push(r.phone_no.substring(0, 5));
+        const k = r.phone_no.toLowerCase().trim();
+        ctx.phoneFreq.set(k, (ctx.phoneFreq.get(k) || 0) + 1);
+        if (!ctx.recordIdxByPhone.has(k)) ctx.recordIdxByPhone.set(k, []);
+        ctx.recordIdxByPhone.get(k).push(idx);
+      }
+      if (r.pan_card_no) {
+        const k = r.pan_card_no.toUpperCase().trim();
+        ctx.panFreq.set(k, (ctx.panFreq.get(k) || 0) + 1);
+        if (!ctx.recordIdxByPan.has(k)) ctx.recordIdxByPan.set(k, []);
+        ctx.recordIdxByPan.get(k).push(idx);
+      }
+    });
+
+    ctx.averages = meanStd(accLens);
+    ctx.lengthFields = {
+      account_no: { values: accLens, meanStd: meanStd(accLens), iqr: iqrBounds(accLens) },
+      complete_address: { values: addrLens, meanStd: meanStd(addrLens), iqr: iqrBounds(addrLens) },
+      email_id: { values: emailLens, meanStd: meanStd(emailLens), iqr: iqrBounds(emailLens) }
+    };
+
+    ctx.domainFreq = freqTable(domains);
+    ctx.phonePrefixFreq = freqTable(phonePrefixes);
+
+    return ctx;
+  }
+
+  function bucketLevel(score) {
+    if (score >= 80) return 'CRITICAL';
+    if (score >= 55) return 'HIGH';
+    if (score >= 30) return 'MEDIUM';
+    return 'LOW';
+  }
+
+  function computeRiskScore(record, ctx, idx) {
+    const factors = [];
+    let score = 0;
+
+    const add = (label, weight, evidence) => {
+      if (weight > 0) { score += weight; factors.push({ label, weight, evidence }); }
+    };
+
+    if (!record.pan_card_no) add('Missing PAN', 18, 'No PAN on record');
+    else if (!/^[A-Z]{5}\d{4}[A-Z]$/.test(record.pan_card_no.toUpperCase().trim())) {
+      add('Invalid PAN format', 8, `Value: ${record.pan_card_no}`);
+    }
+    if (!record.aadhaar_no) add('Missing Aadhaar', 12, 'No Aadhaar on record');
+    else if (/[xX]{4,}/.test(record.aadhaar_no)) add('Aadhaar masked', 10, 'Aadhaar value appears masked (xxxx)');
+    if (!record.phone_no) add('Missing phone', 10, 'No phone on record');
+    if (!record.email_id) add('Missing email', 6, 'No email on record');
+    if (!record._photoDataURL) add('No photo extracted', 8, 'KYC photo not found in PDF');
+    if (!record.complete_address || record.complete_address.length < 15) add('Address too short', 8, 'Address length < 15 chars');
+    if (record.account_no) {
+      const len = record.account_no.length;
+      if (len < 9 || len > 18) add('Account No length anomaly', 6, `Length ${len}`);
+    }
+    if (!record.ifsc_code) add('Missing IFSC', 4, 'No IFSC code');
+    else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(record.ifsc_code.toUpperCase().trim())) {
+      add('Invalid IFSC format', 6, `Value: ${record.ifsc_code}`);
+    }
+
+    if (record.email_id) {
+      const at = record.email_id.indexOf('@');
+      if (at > 0) {
+        const dom = record.email_id.substring(at + 1).toLowerCase();
+        const freq = ctx.domainFreq.get(dom) || 0;
+        if (freq === 1 && ctx.n > 5) add('Uncommon email domain', 5, `Domain: ${dom} (unique)`);
+      }
+    }
+    if (record.phone_no) {
+      const prefix = record.phone_no.substring(0, 5);
+      const freq = ctx.phonePrefixFreq.get(prefix) || 0;
+      if (freq === 1 && ctx.n > 5) add('Rare phone prefix', 5, `Prefix: ${prefix} (unique)`);
+    }
+
+    if (record.account_no) {
+      const k = record.account_no.toLowerCase().trim();
+      if ((ctx.accountNoFreq.get(k) || 0) > 1) add('Duplicate account number', 12, `Shared by ${ctx.accountNoFreq.get(k)} records`);
+    }
+    if (record.pan_card_no) {
+      const k = record.pan_card_no.toUpperCase().trim();
+      if ((ctx.panFreq.get(k) || 0) > 1) add('Duplicate PAN', 10, `Shared by ${ctx.panFreq.get(k)} records`);
+    }
+
+    score = Math.min(100, Math.max(0, score));
+    return { score, level: bucketLevel(score), factors };
+  }
+
+  function detectAnomalies(records) {
+    const ctx = buildContext(records);
+    const reports = [];
+    records.forEach((r, idx) => {
+      const accLen = r.account_no ? r.account_no.length : 0;
+      const addrLen = r.complete_address ? r.complete_address.length : 0;
+      const emailLen = r.email_id ? r.email_id.length : 0;
+      const accStats = ctx.lengthFields.account_no;
+      const addrStats = ctx.lengthFields.complete_address;
+      const emailStats = ctx.lengthFields.email_id;
+
+      if (accStats.values.length >= 5 && r.account_no) {
+        const z = zScore(accStats.values, accLen);
+        if (Math.abs(z) > 2.5) reports.push({ recordIdx: idx, field: 'account_no', type: 'zscore', score: z, reasons: [`Account-no length z=${z.toFixed(2)}`] });
+        if (accLen < accStats.iqr.lo || accLen > accStats.iqr.hi) reports.push({ recordIdx: idx, field: 'account_no', type: 'iqr', score: accLen, reasons: [`Account-no length ${accLen} outside [${accStats.iqr.lo.toFixed(0)}, ${accStats.iqr.hi.toFixed(0)}]`] });
+      }
+      if (addrStats.values.length >= 5 && r.complete_address) {
+        const z = zScore(addrStats.values, addrLen);
+        if (Math.abs(z) > 2.5) reports.push({ recordIdx: idx, field: 'complete_address', type: 'zscore', score: z, reasons: [`Address length z=${z.toFixed(2)}`] });
+        if (addrLen < addrStats.iqr.lo || addrLen > addrStats.iqr.hi) reports.push({ recordIdx: idx, field: 'complete_address', type: 'iqr', score: addrLen, reasons: [`Address length ${addrLen} outside IQR bounds`] });
+      }
+      if (emailStats.values.length >= 5 && r.email_id) {
+        const z = zScore(emailStats.values, emailLen);
+        if (Math.abs(z) > 2.5) reports.push({ recordIdx: idx, field: 'email_id', type: 'zscore', score: z, reasons: [`Email length z=${z.toFixed(2)}`] });
+      }
+      if (r.email_id && ctx.n > 5) {
+        const at = r.email_id.indexOf('@');
+        if (at > 0) {
+          const dom = r.email_id.substring(at + 1).toLowerCase();
+          if ((ctx.domainFreq.get(dom) || 0) === 1) reports.push({ recordIdx: idx, field: 'email_id', type: 'pattern', score: 1, reasons: [`Uncommon email domain: ${dom}`] });
+        }
+      }
+      if (r.phone_no && ctx.n > 5) {
+        const prefix = r.phone_no.substring(0, 5);
+        if ((ctx.phonePrefixFreq.get(prefix) || 0) === 1) reports.push({ recordIdx: idx, field: 'phone_no', type: 'pattern', score: 1, reasons: [`Rare phone prefix: ${prefix}`] });
+      }
+    });
+    return reports;
+  }
+
+  function findDuplicates(records) {
+    const groups = [];
+    const seen = new Set();
+
+    const push = (type, confidence, members, reasons) => {
+      if (members.length < 2) return;
+      const key = members.slice().sort().join('|');
+      if (seen.has(key)) return;
+      seen.add(key);
+      groups.push({ type, confidence, members, reasons });
+    };
+
+    records.forEach((r, idx) => {
+      if (!r.account_no) return;
+      const k = r.account_no.toLowerCase().trim();
+      const peers = [];
+      records.forEach((other, j) => {
+        if (idx === j) return;
+        if (other.account_no && other.account_no.toLowerCase().trim() === k) peers.push(j);
+      });
+      if (peers.length) push('account_no', 'HIGH', [idx, ...peers], [`Same account number: ${r.account_no}`]);
+    });
+
+    records.forEach((r, idx) => {
+      if (!r.pan_card_no) return;
+      const k = r.pan_card_no.toUpperCase().trim();
+      const peers = [];
+      records.forEach((other, j) => {
+        if (idx === j) return;
+        if (!other.pan_card_no) return;
+        if (other.pan_card_no.toUpperCase().trim() === k && other.account_no !== r.account_no) peers.push(j);
+      });
+      if (peers.length) push('pan', 'MEDIUM', [idx, ...peers], [`Same PAN: ${r.pan_card_no} on different accounts`]);
+    });
+
+    records.forEach((r, idx) => {
+      if (!r.phone_no) return;
+      const k = r.phone_no.toLowerCase().trim();
+      const peers = [];
+      records.forEach((other, j) => {
+        if (idx === j) return;
+        if (!other.phone_no) return;
+        if (other.phone_no.toLowerCase().trim() === k && (other.account_holder_name || '').toLowerCase() !== (r.account_holder_name || '').toLowerCase()) peers.push(j);
+      });
+      if (peers.length) push('phone', 'MEDIUM', [idx, ...peers], [`Same phone: ${r.phone_no} with different names`]);
+    });
+
+    records.forEach((r, idx) => {
+      if (!r.email_id) return;
+      const k = r.email_id.toLowerCase().trim();
+      const peers = [];
+      records.forEach((other, j) => {
+        if (idx === j) return;
+        if (!other.email_id) return;
+        if (other.email_id.toLowerCase().trim() === k && (other.account_holder_name || '').toLowerCase() !== (r.account_holder_name || '').toLowerCase()) peers.push(j);
+      });
+      if (peers.length) push('email', 'LOW', [idx, ...peers], [`Same email: ${r.email_id} with different names`]);
+    });
+
+    return groups;
+  }
+
+  function clusterSimilarRecords(records) {
+    const n = records.length;
+    if (n === 0) return { clusters: [], singletons: [] };
+    const parent = Array.from({ length: n }, (_, i) => i);
+    const find = x => parent[x] === x ? x : (parent[x] = find(parent[x]));
+    const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
+
+    const simCache = new Map();
+    const sim = (a, b) => {
+      if (a === b) return 1;
+      const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+      if (simCache.has(key)) return simCache.get(key);
+      const A = records[a], B = records[b];
+      const nameA = normalizeName(A.account_holder_name || '');
+      const nameB = normalizeName(B.account_holder_name || '');
+      const nameSim = nameA && nameB ? 1 - levenshtein(nameA, nameB) / Math.max(nameA.length, nameB.length) : 0;
+      const addrSim = jaccard(tokenize(A.complete_address || ''), tokenize(B.complete_address || ''));
+      const phoneMatch = (A.phone_no && B.phone_no && A.phone_no === B.phone_no) ? 1 : 0;
+      const emailMatch = (A.email_id && B.email_id && A.email_id.toLowerCase() === B.email_id.toLowerCase()) ? 1 : 0;
+      const contactSim = phoneMatch || emailMatch ? 1 : 0;
+      const score = 0.5 * nameSim + 0.3 * addrSim + 0.2 * contactSim;
+      simCache.set(key, score);
+      return score;
+    };
+
+    const useBlocking = n > 500;
+    const blocks = useBlocking ? new Map() : null;
+    if (useBlocking) {
+      records.forEach((r, idx) => {
+        const nm = normalizeName(r.account_holder_name || '').substring(0, 2);
+        const key = nm || 'zz';
+        if (!blocks.has(key)) blocks.set(key, []);
+        blocks.get(key).push(idx);
+      });
+    }
+
+    const compare = (a, b) => {
+      if (sim(a, b) >= 0.7) union(a, b);
+    };
+
+    if (useBlocking) {
+      for (const [, idxs] of blocks) {
+        for (let i = 0; i < idxs.length; i++) {
+          for (let j = i + 1; j < idxs.length; j++) compare(idxs[i], idxs[j]);
+        }
+      }
+    } else {
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) compare(i, j);
+    }
+
+    const clusterMap = new Map();
+    records.forEach((_, idx) => {
+      const root = find(idx);
+      if (!clusterMap.has(root)) clusterMap.set(root, []);
+      clusterMap.get(root).push(idx);
+    });
+
+    const clusters = [];
+    const singletons = [];
+    for (const [, members] of clusterMap) {
+      if (members.length > 1) clusters.push({ id: clusters.length + 1, records: members, size: members.length });
+      else singletons.push(members[0]);
+    }
+    return { clusters, singletons };
+  }
+
+  function detectPatterns(records) {
+    const findings = [];
+    const weekBuckets = new Map();
+    const monthBuckets = new Map();
+
+    records.forEach((r, idx) => {
+      const dateStr = r.account_opening_date || '';
+      let d = null;
+      const m1 = dateStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+      if (m1) {
+        let yr = parseInt(m1[3], 10);
+        if (yr < 100) yr += 2000;
+        d = new Date(yr, parseInt(m1[2], 10) - 1, parseInt(m1[1], 10));
+      } else {
+        const m2 = dateStr.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+        if (m2) d = new Date(parseInt(m2[1], 10), parseInt(m2[2], 10) - 1, parseInt(m2[3], 10));
+      }
+      if (d && !isNaN(d.getTime())) {
+        const onejan = new Date(d.getFullYear(), 0, 1);
+        const week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+        const wk = `${d.getFullYear()}-W${week}`;
+        if (!weekBuckets.has(wk)) weekBuckets.set(wk, []);
+        weekBuckets.get(wk).push(idx);
+        const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthBuckets.has(mk)) monthBuckets.set(mk, []);
+        monthBuckets.get(mk).push(idx);
+      }
+    });
+
+    for (const [wk, members] of weekBuckets) {
+      if (members.length > 3) findings.push({ kind: 'temporal-week', key: wk, count: members.length, recordIdxs: members, note: `${members.length} accounts opened in ${wk}` });
+    }
+    for (const [mk, members] of monthBuckets) {
+      if (members.length > 5) findings.push({ kind: 'temporal-month', key: mk, count: members.length, recordIdxs: members, note: `${members.length} accounts opened in ${mk}` });
+    }
+
+    const ifscGroups = new Map();
+    records.forEach((r, idx) => {
+      if (!r.ifsc_code) return;
+      const prefix = r.ifsc_code.toUpperCase().substring(0, 5);
+      if (!ifscGroups.has(prefix)) ifscGroups.set(prefix, []);
+      ifscGroups.get(prefix).push(idx);
+    });
+    for (const [prefix, members] of ifscGroups) {
+      if (members.length > 4) findings.push({ kind: 'branch', key: prefix, count: members.length, recordIdxs: members, note: `${members.length} accounts share IFSC prefix ${prefix}` });
+    }
+
+    const domainGroups = new Map();
+    records.forEach((r, idx) => {
+      if (!r.email_id) return;
+      const at = r.email_id.indexOf('@');
+      if (at <= 0) return;
+      const dom = r.email_id.substring(at + 1).toLowerCase();
+      if (!domainGroups.has(dom)) domainGroups.set(dom, []);
+      domainGroups.get(dom).push(idx);
+    });
+    for (const [dom, members] of domainGroups) {
+      if (members.length > 3) findings.push({ kind: 'domain', key: dom, count: members.length, recordIdxs: members, note: `${members.length} accounts on email domain ${dom}` });
+    }
+
+    return findings;
+  }
+
+  function similarityAnalysis(a, b) {
+    const commonFields = [];
+    let score = 0, weightSum = 0;
+
+    const fieldScore = (label, weight, match) => {
+      weightSum += weight;
+      if (match) { score += weight; commonFields.push(label); }
+    };
+
+    fieldScore('account_no', 0.20, a.account_no && b.account_no && a.account_no === b.account_no);
+    fieldScore('pan_card_no', 0.20, a.pan_card_no && b.pan_card_no && a.pan_card_no.toUpperCase() === b.pan_card_no.toUpperCase());
+    fieldScore('phone_no', 0.15, a.phone_no && b.phone_no && a.phone_no === b.phone_no);
+    fieldScore('email_id', 0.15, a.email_id && b.email_id && a.email_id.toLowerCase() === b.email_id.toLowerCase());
+    fieldScore('ifsc_code', 0.05, a.ifsc_code && b.ifsc_code && a.ifsc_code.toUpperCase() === b.ifsc_code.toUpperCase());
+    fieldScore('bank_name', 0.05, a.bank_name && b.bank_name && a.bank_name.toLowerCase() === b.bank_name.toLowerCase());
+
+    const nameA = normalizeName(a.account_holder_name || '');
+    const nameB = normalizeName(b.account_holder_name || '');
+    if (nameA && nameB) {
+      const ns = 1 - levenshtein(nameA, nameB) / Math.max(nameA.length, nameB.length);
+      fieldScore('name_similar', 0.10, ns >= 0.8);
+      score += ns * 0.10;
+    } else weightSum += 0.10;
+
+    const as = jaccard(tokenize(a.complete_address || ''), tokenize(b.complete_address || ''));
+    if (a.complete_address && b.complete_address) {
+      fieldScore('address_similar', 0.10, as >= 0.5);
+      score += as * 0.10;
+    } else weightSum += 0.10;
+
+    return { score: weightSum === 0 ? 0 : score / weightSum, commonFields };
+  }
+
+  return {
+    levenshtein, jaccard, zScore, iqrBounds, tokenize, normalizeName,
+    buildContext, computeRiskScore, detectAnomalies,
+    findDuplicates, clusterSimilarRecords, detectPatterns, similarityAnalysis
+  };
+})();
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+
+const records = [];
+
+const uploadBtn = document.getElementById('uploadBtn');
+const fileInput = document.getElementById('fileInput');
+const progressBar = document.getElementById('progressBar');
+const progressFill = document.getElementById('progressFill');
+const statusEl = document.getElementById('status');
+const statsEl = document.getElementById('stats');
+const controlsEl = document.getElementById('controls');
+const resultsEl = document.getElementById('results');
+const mlPanelEl = document.getElementById('mlPanel');
+
+// ========== ML STATE & RUNNERS ==========
+let lastClusters = { clusters: [], singletons: [] };
+let lastPatterns = [];
+let lastDuplicates = [];
+let lastAnomalies = [];
+let analysisRun = false;
+
+function runMLAnalysis() {
+  return new Promise((resolve) => {
+    const btn = document.getElementById('runAnalysis');
+    if (!records.length) {
+      showStatus('No entities to analyze', 'error');
+      resolve(false);
+      return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-ring"></span>Analyzing…';
+
+    // Defer to next tick so the loading state renders first.
+    setTimeout(() => {
+      try {
+        const ctx = MLEngine.buildContext(records);
+        records.forEach((r, idx) => { r._risk = MLEngine.computeRiskScore(r, ctx, idx); });
+        lastAnomalies = MLEngine.detectAnomalies(records);
+        const idxToAnomalies = new Map();
+        lastAnomalies.forEach(a => {
+          if (!idxToAnomalies.has(a.recordIdx)) idxToAnomalies.set(a.recordIdx, []);
+          idxToAnomalies.get(a.recordIdx).push(a);
+        });
+        records.forEach((r, idx) => { r._anomalies = idxToAnomalies.get(idx) || []; });
+        lastDuplicates = MLEngine.findDuplicates(records);
+        records.forEach(r => { r._duplicateGroup = null; });
+        lastDuplicates.forEach((g, gi) => { g.members.forEach(idx => { records[idx]._duplicateGroup = gi; }); });
+        lastClusters = MLEngine.clusterSimilarRecords(records);
+        lastPatterns = MLEngine.detectPatterns(records);
+
+        // Update tiles
+        const scores = records.map(r => r._risk.score);
+        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        const highRisk = records.filter(r => r._risk.level === 'HIGH' || r._risk.level === 'CRITICAL').length;
+        document.getElementById('mlAvgRisk').textContent = avg.toFixed(1);
+        document.getElementById('mlHighRisk').textContent = highRisk;
+        document.getElementById('mlAnomalies').textContent = lastAnomalies.length;
+        document.getElementById('mlDupes').textContent = lastDuplicates.length;
+        document.getElementById('mlPatterns').textContent = lastPatterns.length + lastClusters.clusters.length;
+
+        mlPanelEl.style.display = 'block';
+        analysisRun = true;
+        renderResults();
+        showStatus(`Analysis complete — ${records.length} entities scored, ${lastAnomalies.length} anomalies, ${lastDuplicates.length} duplicate groups`, 'success');
+        resolve(true);
+      } catch (e) {
+        console.error('ML analysis failed', e);
+        showStatus('Analysis failed: ' + e.message, 'error');
+        resolve(false);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Run Analysis';
+      }
+    }, 30);
+  });
+}
+
+// Filters out factors/anomalies that originate from PDF-extraction noise
+// (no photo extracted, rare phone prefix, uncommon email domain, etc.).
+// Only IDENTITY-level and INFRASTRUCTURE-level intelligence is shown.
+const PDF_NOISE_LABEL_PATTERNS = [
+  /^no photo/i,
+  /^rare phone prefix/i,
+  /^uncommon email domain/i,
+  /^aadhaar masked/i,
+  /^invalid pan format/i,
+  /^invalid ifsc format/i,
+  /^address too short/i,
+  /^account no length anomaly/i
+];
+const PDF_NOISE_ANOMALY_FIELD_PREFIXES = ['phone_no', 'email_id'];
+
+function isPdfNoiseFactor(f) {
+  return PDF_NOISE_LABEL_PATTERNS.some(p => p.test(f.label));
+}
+
+function isPdfNoiseAnomaly(a) {
+  return PDF_NOISE_ANOMALY_FIELD_PREFIXES.includes(a.field)
+    || /uncommon email domain|rare phone prefix/i.test(a.reasons.join(' '));
+}
+
+// Expose to window so all functions in the script (including ones declared
+// later) can reach them reliably.
+window.isPdfNoiseFactor = isPdfNoiseFactor;
+window.isPdfNoiseAnomaly = isPdfNoiseAnomaly;
+
+function toggleRowExpansion(recordIdx) {
+  const tbody = resultsEl.querySelector('tbody');
+  if (!tbody) return;
+  const row = tbody.querySelector(`tr[data-idx="${recordIdx}"]`);
+  if (!row) return;
+  const next = row.nextElementSibling;
+  if (next && next.classList.contains('row-expanded')) {
+    next.remove();
+    return;
+  }
+
+  // Remove any other expanded rows
+  tbody.querySelectorAll('tr.row-expanded').forEach(r => r.remove());
+  const r = records[recordIdx];
+  if (!r || !r._risk) return;
+  const cleanFactors = (r._risk.factors || []).filter(f => !isPdfNoiseFactor(f));
+  const factors = cleanFactors.map(f => `<li>${escapeHtml(f.label)} <span class="weight">(+${f.weight})</span> — ${escapeHtml(f.evidence)}</li>`).join('');
+  const cleanAnomalies = (r._anomalies || []).filter(a => !isPdfNoiseAnomaly(a));
+  const anomalies = cleanAnomalies.map(a => `<li>${escapeHtml(a.field)}: ${a.reasons.map(escapeHtml).join('; ')}</li>`).join('');
+  const dup = r._duplicateGroup !== null && r._duplicateGroup !== undefined
+    ? `<li>Duplicate group #${r._duplicateGroup + 1}: ${lastDuplicates[r._duplicateGroup].members.map(i => escapeHtml(records[i].account_holder_name || `#${i}`)).join(', ')}</li>`
+    : '';
+  const tr = document.createElement('tr');
+  tr.className = 'row-expanded';
+  tr.innerHTML = `<td colspan="14">
+    <div class="expanded-panel">
+      <div>
+        <h4>◆ Risk Factors (score: ${r._risk.score} / ${r._risk.level})</h4>
+        <ul>${factors || '<li class="small">No risk factors</li>'}</ul>
+      </div>
+      <div>
+        <h4>◆ Anomalies</h4>
+        <ul>${anomalies || '<li class="small">No anomalies</li>'}</ul>
+        ${dup ? `<h4 style="margin-top:12px">◆ Duplicates</h4><ul>${dup}</ul>` : ''}
+      </div>
+    </div>
+  </td>`;
+  row.after(tr);
+}
+
+uploadBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => {
+  const files = Array.from(e.target.files);
+  if (files.length) processFiles(files);
+  fileInput.value = '';
+});
+
+document.getElementById('clearBtn').onclick = () => {
+  records.length = 0;
+  searchInput.value = '';
+  currentQuery = '';
+  searchInfo.style.display = 'none';
+  mlPanelEl.style.display = 'none';
+  analysisRun = false;
+  lastAnomalies = []; lastDuplicates = []; lastClusters = { clusters: [], singletons: [] }; lastPatterns = [];
+  renderResults();
+  showStatus('Workspace purged.', 'success');
+};
+document.getElementById('exportXlsx').onclick = () => exportData('xlsx');
+document.getElementById('exportCsv').onclick = () => exportData('csv');
+document.getElementById('exportJson').onclick = () => exportData('json');
+document.getElementById('exportPdf').onclick = () => exportRiskReport();
+document.getElementById('runAnalysis').onclick = () => runMLAnalysis();
+
+// Delegated row click for risk expansion
+resultsEl.addEventListener('click', (e) => {
+  const tr = e.target.closest('tr.clickable');
+  if (!tr) return;
+  const idx = parseInt(tr.getAttribute('data-idx'), 10);
+  if (!isNaN(idx)) toggleRowExpansion(idx);
+});
+
+const searchBar = document.getElementById('searchBar');
+const searchInput = document.getElementById('searchInput');
+const searchBtn = document.getElementById('searchBtn');
+const searchInfo = document.getElementById('searchInfo');
+const searchCount = document.getElementById('searchCount');
+const totalCount = document.getElementById('totalCount');
+const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+let currentQuery = '';
+
+// Search across Account No., Phone No., Email ID, and PAN
+function performSearch(query) {
+  currentQuery = (query || '').trim().toLowerCase();
+  if (!records.length) {
+    searchBar.style.display = 'none';
+    return;
+  }
+  searchBar.style.display = 'block';
+
+  if (!currentQuery) {
+    searchInfo.style.display = 'none';
+    renderResults();
+    return;
+  }
+
+  const filtered = records.filter(r => {
+    const searchFields = [
+      r.account_no || '',
+      r.phone_no || '',
+      r.email_id || '',
+      r.pan_card_no || ''
+    ];
+    return searchFields.some(f => f.toLowerCase().includes(currentQuery));
+  });
+
+  searchCount.textContent = filtered.length;
+  totalCount.textContent = records.length;
+  searchInfo.style.display = 'flex';
+  renderResults(filtered);
+
+  if (filtered.length === 0) {
+    showStatus(`No records found for "${query}"`, 'error');
+  }
+}
+
+searchBtn.onclick = () => performSearch(searchInput.value);
+searchInput.addEventListener('input', () => performSearch(searchInput.value));
+searchInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') performSearch(searchInput.value);
+});
+clearSearchBtn.onclick = () => {
+  searchInput.value = '';
+  performSearch('');
+};
+
+function showStatus(msg, type = '') {
+  statusEl.className = 'status ' + type;
+  statusEl.textContent = msg;
+  statusEl.style.display = 'block';
+}
+function setProgress(percent) {
+  progressBar.style.display = 'block';
+  progressFill.style.width = percent + '%';
+}
+function hideProgress() {
+  progressBar.style.display = 'none';
+  progressFill.style.width = '0%';
+}
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"' && text[i+1] === '"') { field += '"'; i++; }
+      else if (c === '"') { inQuotes = false; }
+      else { field += c; }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i+1] === '\n') i++;
+        row.push(field); rows.push(row); row = []; field = '';
+      } else { field += c; }
+    }
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  // Normalize every cell: if a cell arrived in scientific notation
+  // (e.g. "9.19892E+11"), expand it back to the full decimal digits.
+  // This protects against Excel-exported CSVs where phone / account /
+  // aadhaar fields got auto-converted to scientific form.
+  return rows
+    .map(r => r.map(c => normalizeScientificString(c)))
+    .filter(r => r.length > 1 || (r.length === 1 && r[0].trim()));
+}
+
+function getField(headers, data, candidates) {
+  const lowerHeaders = headers.map(h => h.toLowerCase().trim());
+  for (const cand of candidates) {
+    const idx = lowerHeaders.indexOf(cand.toLowerCase());
+    if (idx !== -1 && idx < data.length) return normalizeScientificString(data[idx]).trim();
+  }
+  return '';
+}
+
+// Strip visible separators (spaces, dashes, dots, parentheses) from
+// numeric IDs like phone numbers ("7639-3279-6425" → "763932796425")
+// or Aadhaar values. Preserves a leading '+' for international numbers.
+function stripSeparators(value) {
+  if (!value) return '';
+  let s = String(value).trim();
+  const hasPlus = s.startsWith('+');
+  s = s.replace(/[\s\-().]/g, '');
+  return hasPlus && !s.startsWith('+') ? '+' + s : s;
+}
+
+// Convert a base64 dataURL string into an HTMLImageElement so jsPDF
+// can embed it via addImage. Returns null if the dataURL is invalid.
+function dataURLToImage(dataURL) {
+  return new Promise((resolve) => {
+    if (!dataURL || typeof dataURL !== 'string') return resolve(null);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = dataURL;
+  });
+}
+
+// Detect values that arrived in scientific notation (e.g. "9.19892E+11")
+// and expand them back to the original decimal string so the digits
+// survive every downstream consumer (render, export, PDF).
+function normalizeScientificString(value) {
+  if (value === null || value === undefined) return '';
+  // If it's a real Number type, coerce through toString which JS may
+  // still render in scientific form for very large/small numbers.
+  if (typeof value === 'number') {
+    if (!isFinite(value)) return String(value);
+    const s = String(value);
+    if (!/[eE]/.test(s)) return s;
+    return value.toFixed(20).replace(/\.?0+$/, '');
+  }
+  const str = String(value);
+  // Match e.g. "9.19892E+11", "9.19892e+11", "9.19892E11", "-1.5E-3"
+  // Tolerate surrounding whitespace from CSV cells.
+  const sciMatch = str.trim().match(/^(-?)(\d+)(?:\.(\d+))?[eE]([+-]?\d+)$/);
+  if (!sciMatch) return str;
+  const sign = sciMatch[1];
+  const intPart = sciMatch[2];
+  const fracPart = sciMatch[3] || '';
+  const exp = parseInt(sciMatch[4], 10);
+  const combined = intPart + fracPart;
+  const expAdjust = exp - fracPart.length;
+  let result;
+  if (expAdjust >= 0) {
+    result = combined + '0'.repeat(expAdjust);
+  } else {
+    const splitAt = combined.length + expAdjust;
+    if (splitAt <= 0) {
+      result = '0.' + '0'.repeat(-splitAt) + combined;
+    } else {
+      result = combined.substring(0, splitAt) + '.' + combined.substring(splitAt);
+    }
+  }
+  // Strip trailing zeros after decimal but keep at least one digit.
+  if (result.indexOf('.') !== -1) {
+    result = result.replace(/\.?0+$/, '');
+  }
+  return sign + result;
+}
+
+function cleanAddress(addr) {
+  if (!addr) return '';
+  return addr.split(/[\n\r]+/).map(s => s.split(',').map(p => p.trim()).filter(Boolean).join(', '))
+              .filter(Boolean).join(', ');
+}
+
+function cleanEmails(raw) {
+  if (!raw) return '';
+  return raw.replace(/["']/g, '').trim();
+}
+
+async function extractPDFText(arrayBuffer) {
+  try {
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map(it => it.str).join(' ');
+      fullText += pageText + '\n';
+    }
+    return { text: fullText, textItems: [], pdf };
+  } catch (e) {
+    return { text: '', textItems: [], pdf: null };
+  }
+}
+
+// OCR a PDF page using Tesseract.js (for scanned/image-only PDFs)
+async function ocrPDFPage(page, scale = 1.5) {
+  if (typeof Tesseract === 'undefined') return '';
+  try {
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+    const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+    const { data: { text } } = await Tesseract.recognize(dataURL, 'eng', {
+      logger: () => {}
+    });
+    return text;
+  } catch (e) {
+    return '';
+  }
+}
+
+// Render a page to a canvas at the given scale, return canvas + viewport info
+async function renderPageToCanvas(page, scale) {
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext('2d');
+  await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+  return { canvas, ctx, viewport, width: viewport.width, height: viewport.height };
+}
+
+// Detect photo region on a page by finding "Customer Photo" label or by analyzing
+// the largest rectangular area that looks like a portrait photo.
+// Only checks the first 2 pages — KYC photos are almost always on page 1 or 2.
+async function extractPhotoFromPDF(pdf) {
+  if (!pdf) return null;
+  const maxPages = Math.min(pdf.numPages, 2);
+  for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    // Render at 1.5x — sufficient for photo detection, much faster than 2.0
+    const { canvas, viewport } = await renderPageToCanvas(page, 1.5);
+
+    // Get text positions to find "Customer Photo" label
+    const textContent = await page.getTextContent();
+    let photoLabelX = null, photoLabelY = null;
+
+    textContent.items.forEach(it => {
+      const tx = pdfjsLib.Util.transform(viewport.transform, it.transform);
+      const txt = it.str.toLowerCase();
+      if (txt.includes('customer photo') || txt.includes('photo as per')) {
+        photoLabelX = tx[4];
+        photoLabelY = tx[5];
+      }
+    });
+
+    // If we found a "Customer Photo" label, crop the area around/below it
+    // Photo is typically to the right of or below the label
+    if (photoLabelX !== null && photoLabelY !== null) {
+      // Convert PDF coords to canvas coords (note: canvas Y is flipped from PDF Y)
+      const pdfW = viewport.width;
+      const pdfH = viewport.height;
+
+      // Photo region: usually to the left of or above "Customer Photo" label
+      // Try multiple plausible regions and pick the most "photo-like" one
+      const candidateRects = [
+        // Photo to the left of label
+        { x: Math.max(0, photoLabelX - 130), y: Math.max(0, pdfH - photoLabelY - 200),
+          w: 120, h: 160 },
+        // Photo above label
+        { x: Math.max(0, photoLabelX - 60), y: Math.max(0, pdfH - photoLabelY - 240),
+          w: 120, h: 200 },
+        // Photo to the right
+        { x: Math.min(pdfW - 130, photoLabelX + 50), y: Math.max(0, pdfH - photoLabelY - 100),
+          w: 120, h: 160 },
+      ];
+
+      for (const rect of candidateRects) {
+        const cropped = cropCanvas(canvas, rect);
+        const isPhoto = await isLikelyPhoto(cropped);
+        if (isPhoto) {
+          return cropped.toDataURL('image/jpeg', 0.85);
+        }
+      }
+    }
+
+    // Fallback: scan the entire page for the most "photo-like" region
+    const fullPhoto = await findPhotoInCanvas(canvas);
+    if (fullPhoto) return fullPhoto;
+  }
+  return null;
+}
+
+function cropCanvas(srcCanvas, rect) {
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(rect.w));
+  c.height = Math.max(1, Math.round(rect.h));
+  const ctx = c.getContext('2d');
+  ctx.drawImage(srcCanvas,
+    Math.round(rect.x), Math.round(rect.y), c.width, c.height,
+    0, 0, c.width, c.height);
+  return c;
+}
+
+// Heuristic: check if a cropped region looks like a portrait photo.
+// Samples every 4th pixel (16x speedup) — still gives accurate detection.
+function isLikelyPhoto(canvas) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  if (w < 50 || h < 50) return false;
+  const data = ctx.getImageData(0, 0, w, h).data;
+  const colorCounts = new Map();
+  let totalPixels = 0;
+  for (let i = 0; i < data.length; i += 16) {
+    const r = data[i], g = data[i+1], b = data[i+2];
+    if (r > 240 && g > 240 && b > 240) continue;
+    if (r < 15 && g < 15 && b < 15) continue;
+    const key = `${r>>5}-${g>>5}-${b>>5}`;
+    colorCounts.set(key, (colorCounts.get(key) || 0) + 1);
+    totalPixels++;
+  }
+  // A photo should have > 60 unique color buckets and > 4% non-background pixels
+  // (thresholds tuned for sampled data — original was 100/5% on full pixels)
+  return colorCounts.size > 60 && totalPixels > (w * h * 0.04);
+}
+
+// Scan entire canvas for photo-like regions — coarse scan with limited
+// candidates to keep extraction fast on large documents.
+async function findPhotoInCanvas(canvas) {
+  const w = canvas.width, h = canvas.height;
+  const candidates = [];
+  // Coarser grid: 3 rows × 3 cols over the right half (9 candidates instead of ~24)
+  const regionH = Math.floor(h / 4);
+  const regionW = Math.floor(w / 4);
+  const xStart = Math.floor(w / 3);
+  const xStep = Math.floor(regionW * 0.75);
+  const yStep = Math.floor(regionH * 0.75);
+
+  for (let y = 0; y < h - regionH; y += yStep) {
+    for (let x = xStart; x < w - regionW; x += xStep) {
+      const cropped = cropCanvas(canvas, { x, y, w: regionW, h: regionH });
+      if (isLikelyPhoto(cropped)) {
+        candidates.push({ x, y, w: regionW, h: regionH, canvas: cropped });
+      }
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  // Pick the candidate with most varied colors (likely a real photo).
+  // Score all candidates in a single pass over the canvas image data
+  // rather than re-reading each cropped region.
+  const ctx = canvas.getContext('2d');
+  const fullData = ctx.getImageData(0, 0, w, h).data;
+  let best = candidates[0], bestScore = 0;
+  for (const cand of candidates) {
+    const colors = new Set();
+    const startY = cand.y, endY = cand.y + cand.h;
+    const startX = cand.x, endX = cand.x + cand.w;
+    // Sample every 8th pixel to keep this fast.
+    for (let py = startY; py < endY; py += 4) {
+      for (let px = startX; px < endX; px += 4) {
+        const i = (py * w + px) * 4;
+        colors.add(`${fullData[i]>>4}-${fullData[i+1]>>4}-${fullData[i+2]>>4}`);
+      }
+    }
+    if (colors.size > bestScore) { bestScore = colors.size; best = cand; }
+  }
+
+  // Return expanded crop around the best region
+  const expanded = cropCanvas(canvas, {
+    x: Math.max(0, best.x - 20),
+    y: Math.max(0, best.y - 20),
+    w: Math.min(w - best.x + 20, best.w + 40),
+    h: Math.min(h - best.y + 20, best.h + 40),
+  });
+  return expanded.toDataURL('image/jpeg', 0.8);
+}
+
+function extractPAN(text) {
+  const m = text.match(/\b([A-Z]{5}\d{4}[A-Z])\b/);
+  return m ? m[1] : '';
+}
+
+function extractAadhaar(text) {
+  // Order matters: ATM card masked format first (XXXXXX then 4 digits), then standard Aadhaar masked, then full 12-digit
+  const patterns = [
+    /\d{6}X{4,}\d{4}/i,           // ATM card format: 436371XXXXXX2550
+    /x{4,}\d{4}/i,                // Standard masked: xxxxxxxx4471
+    /\b\d{12}\b/,                 // Full 12-digit
+    /\b\d{4}\s*\d{4}\s*\d{4}\b/,  // Spaced 12-digit
+  ];
+  for (const pat of patterns) {
+    const m = text.match(pat);
+    if (m) return m[0];
+  }
+  return '';
+}
+
+function extractAddressFromPDF(text) {
+  // PDF.js returns text where labels and values are often on separate lines.
+  // Walk through and pick up content after key labels until next label.
+  const lines = [];
+
+  // 1) Customer Full Address - value follows on subsequent non-empty lines
+  const labelIdx = text.indexOf('Customer Full Address');
+  if (labelIdx !== -1) {
+    const after = text.substring(labelIdx + 'Customer Full Address'.length);
+    const addrLines = [];
+    const parts = after.split(/\n+/).map(s => s.trim()).filter(Boolean);
+    for (const p of parts) {
+      if (/^(State|PIN|Proof|Customer Photo|Date of Birth|Email Address|Authorised|Registered|Business|Mobile|Telephone)/i.test(p)) break;
+      addrLines.push(p);
+    }
+    if (addrLines.length) lines.push(addrLines.join(', '));
+  }
+
+  // 2) State
+  const stateMatch = text.match(/State\s*\n+\s*([A-Z][A-Z\s]+?)(?:\s*\n|$)/i);
+  if (stateMatch) lines.push('State: ' + stateMatch[1].trim());
+
+  // 3) PIN Code
+  const pinMatch = text.match(/PIN Code\s*\n+\s*(\d{6})/i);
+  if (pinMatch) lines.push('PIN: ' + pinMatch[1]);
+
+  // 4) Business/Communication/Registered address - common in AccountOpeningDoc
+  const bizAddrLabels = [
+    /Business\s*\(?Communication\)?\s*address\s*\n+([\s\S]+?)(?:\n\s*\n|Mobile|Telephone|Email|Nature of Ownership|Operating|Registered|$)/i,
+    /Communication\s*address\s*\n+([\s\S]+?)(?:\n\s*\n|Mobile|Telephone|Email|Nature of Ownership|Operating|$)/i,
+    /Business\s*address\s*\n+([\s\S]+?)(?:\n\s*\n|Mobile|Telephone|Email|Nature of Ownership|Operating|$)/i,
+    /Registered\s*Address\s*\n+([\s\S]+?)(?:\n\s*\n|Mobile|Telephone|Email|Nature of Ownership|Operating|Authorised|$)/i
+  ];
+  for (const pat of bizAddrLabels) {
+    const m = text.match(pat);
+    if (m) {
+      const raw = m[1].split(/\n+/).map(s => s.trim()).filter(Boolean).join(', ');
+      if (raw && raw.length > 5) {
+        lines.push(raw);
+        break;
+      }
+    }
+  }
+
+  // 5) Address field with multi-line content (e.g., H 20\nDurga mandir...)
+  const addressBlock = text.match(/Address\s*\n+([\s\S]+?)(?:\n\s*\n|NOMINEE|Account No|Statement|$)/i);
+  if (addressBlock) {
+    const addr = addressBlock[1].split(/\n+/).map(s => s.trim()).filter(Boolean).join(', ');
+    if (addr && !lines.some(l => l.includes(addr.split(',')[0]))) {
+      lines.unshift(addr);
+    }
+  }
+
+  return lines.filter(Boolean).join(' | ');
+}
+
+// Better address extraction that ignores label text and picks up
+// complete addresses from any source. Returns the BEST address found.
+function extractBestAddress(allTexts) {
+  let best = '';
+  for (const text of allTexts) {
+    // Strategy A: structured extraction
+    const addr = extractAddressFromPDF(text);
+    if (addr && addr.length > best.length) {
+      best = addr;
+    }
+    // Strategy B: explicit "Communication/Business/Registered address" content
+    const commPatterns = [
+      /(?:Communication|Business|Registered|Office|Home)\s*\(?[A-Za-z\s]*\)?\s*[Aa]ddress\s*[:\-]?\s*\n+([\s\S]+?)(?:\n\s*\n|Mobile|Telephone|Email|District|State|PIN|Nature of Ownership|Operating|Authorised|Account No|$)/i,
+    ];
+    for (const pat of commPatterns) {
+      const m = text.match(pat);
+      if (m) {
+        const ca = m[1].split(/\n+/).map(s => s.trim()).filter(Boolean).join(', ');
+        if (ca && ca.length > best.length) best = ca;
+      }
+    }
+  }
+  return best;
+}
+
+function extractOpeningDate(text) {
+  const patterns = [
+    /Date of Application\s*:?\s*([\w\s,]+\d{4})/i,
+    /A\/C Opening date\s*:?\s*([\d\-\/A-Za-z]+)/i
+  ];
+  for (const pat of patterns) {
+    const m = text.match(pat);
+    if (m) return m[1].trim();
+  }
+  return '';
+}
+
+function extractEmailFromText(text) {
+  const m = text.match(/[\w._-]+@[\w.-]+\.[A-Za-z]{2,}/);
+  return m ? m[0] : '';
+}
+
+function extractPhoneFromText(text) {
+  const m = text.match(/\+?91[\s-]?\(?\d{4,5}\)?[\s-]?\d{5,8}/);
+  if (m) return normalizeScientificString(m[0]);
+  const m2 = text.match(/\b[6-9]\d{9}\b/);
+  return m2 ? normalizeScientificString(m2[0]) : '';
+}
+
+async function processFiles(files) {
+  const total = files.length;
+  let processed = 0;
+  let errors = 0;
+  let photosFound = 0;
+
+  showStatus(`Ingesting ${total} archive(s)...`);
+  setProgress(0);
+  controlsEl.style.display = 'none';
+  statsEl.style.display = 'none';
+  mlPanelEl.style.display = 'none';
+
+  // Process up to 4 files concurrently — keeps memory bounded while
+  // giving a ~3-4x speedup over strict sequential processing.
+  const CONCURRENCY = Math.min(4, total);
+  const queue = files.slice();
+  const workers = [];
+
+  const worker = async () => {
+    while (queue.length > 0) {
+      const file = queue.shift();
+      try {
+        const result = await processOneZip(file);
+        if (result) {
+          records.push(result);
+          if (result._photoDataURL) photosFound++;
+        }
+      } catch (e) {
+        console.error('Error processing', file.name, e);
+        errors++;
+      }
+      processed++;
+      setProgress((processed / total) * 100);
+      updateStats(processed, records.length, photosFound, errors);
+    }
+  };
+
+  for (let i = 0; i < CONCURRENCY; i++) workers.push(worker());
+  await Promise.all(workers);
+
+  hideProgress();
+  renderResults();
+  showStatus(`Scan complete — ${processed} archive(s) processed, ${records.length} entit${records.length === 1 ? 'y' : 'ies'} profiled, ${photosFound} photo${photosFound === 1 ? '' : 's'} captured.`, 'success');
+  controlsEl.style.display = records.length ? 'flex' : 'none';
+  statsEl.style.display = 'grid';
+  searchBar.style.display = records.length ? 'block' : 'none';
+  mlPanelEl.style.display = records.length ? 'block' : 'none';
+  // Re-apply any active search
+  if (currentQuery) performSearch(searchInput.value);
+}
+
+async function processOneZip(file) {
+  const zip = await JSZip.loadAsync(file);
+  let accCSV = null, bankCSV = null, kycPDF = null, accOpenPDF = null, otherPDFs = [];
+
+  for (const [path, entry] of Object.entries(zip.files)) {
+    if (entry.dir) continue;
+    const name = path.split('/').pop();
+    if (/Accountholder.*\.csv$/i.test(name)) accCSV = entry;
+    else if (/BankDetail.*\.csv$/i.test(name)) bankCSV = entry;
+    else if (/^KYCDoc.*\.pdf$/i.test(name)) kycPDF = entry;
+    else if (/AccountOpeningDoc.*\.pdf$/i.test(name)) accOpenPDF = entry;
+    else if (/\.pdf$/i.test(name)) otherPDFs.push(entry);
+  }
+
+  const rec = {
+    account_holder_name: '',
+    account_no: '',
+    complete_address: '',
+    phone_no: '',
+    pan_card_no: '',
+    aadhaar_no: '',
+    email_id: '',
+    account_opening_date: '',
+    bank_name: '',
+    ifsc_code: '',
+    branch_email: '',
+    branch_phone: '',
+    photo: '',
+    _photoDataURL: null
+  };
+
+  // Account holder CSV
+  if (accCSV) {
+    const text = await accCSV.async('string');
+    const rows = parseCSV(text);
+    if (rows.length >= 2) {
+      const headers = rows[0];
+      const data = rows[1];
+      rec.account_holder_name = getField(headers, data, ['A/c. Holder Name', 'A/c Holder Name', 'Account Holder Name']);
+      rec.account_no = getField(headers, data, ['A/c No.', 'A/c No', 'A/c Number', 'Account No', 'Account Number']);
+      rec.phone_no = stripSeparators(getField(headers, data, ['Phone No.', 'Phone No', 'Mobile No.', 'Mobile Number']));
+      rec.email_id = getField(headers, data, ['Email ID', 'Email', 'Email Id']);
+      rec.pan_card_no = getField(headers, data, ['PAN No.', 'PAN No', 'PAN']);
+      rec.account_opening_date = getField(headers, data, ['A/C Opening date', 'A/C Opening Date', 'Account Opening Date']);
+      // Build complete address: combine customer city + any address-related fields
+      const city = getField(headers, data, ['Customer City', 'Customer Address', 'Address']);
+      rec._csvCity = city;  // Save raw city for later fallback
+      rec.complete_address = cleanAddress(city);
+      // Try to get Aadhaar from PHOTO Identity ID No.
+      rec.aadhaar_no = getField(headers, data, ['PHOTO Identity ID No.', 'Photo Identity ID No.']);
+    }
+  }
+
+  // Bank detail CSV
+  if (bankCSV) {
+    const text = await bankCSV.async('string');
+    const rows = parseCSV(text);
+    if (rows.length >= 2) {
+      const headers = rows[0];
+      const data = rows[1];
+      rec.bank_name = getField(headers, data, ['Bank Name']);
+      rec.ifsc_code = getField(headers, data, ['IFSC Code', 'IFSC']);
+      rec.branch_email = cleanEmails(getField(headers, data, ['Manager Email ID', 'Branch Email ID', 'Branch Email']));
+      rec.branch_phone = cleanEmails(getField(headers, data, ['Manager Mobile No', 'Manager Mobile No.', 'Branch Phone']));
+      // Capture location from bank CSV to enhance address
+      rec._bankDistrict = getField(headers, data, ['District']);
+      rec._bankState = getField(headers, data, ['State']);
+      rec._bankPIN = getField(headers, data, ['PIN Code', 'Pincode']);
+    }
+  }
+
+  // KYC PDF — extract text, photo, missing fields
+  let kycPdfObj = null;
+  const allPdfTexts = [];
+  if (kycPDF) {
+    const buffer = await kycPDF.async('arraybuffer');
+    const pdfData = await extractPDFText(buffer);
+    kycPdfObj = pdfData.pdf;
+    let text = pdfData.text;
+
+    // If PDF.js returns no text (scanned PDF), fall back to OCR
+    if ((!text || text.trim().length < 20) && kycPdfObj) {
+      try {
+        const ocrTexts = [];
+        // Only OCR the first 2 pages — most KYC fields live on page 1.
+        for (let i = 1; i <= Math.min(kycPdfObj.numPages, 2); i++) {
+          const page = await kycPdfObj.getPage(i);
+          const ocrText = await ocrPDFPage(page, 1.5);
+          if (ocrText && ocrText.trim().length > 10) ocrTexts.push(ocrText);
+        }
+        if (ocrTexts.length) text = ocrTexts.join('\n');
+      } catch (e) {}
+    }
+
+    allPdfTexts.push(text);
+
+    if (!rec.pan_card_no) {
+      const pan = extractPAN(text);
+      if (pan) rec.pan_card_no = pan;
+    }
+    if (!rec.aadhaar_no || rec.aadhaar_no === 'NA') {
+      const aadhaar = extractAadhaar(text);
+      if (aadhaar) rec.aadhaar_no = aadhaar;
+    }
+    if (!rec.email_id) {
+      const email = extractEmailFromText(text);
+      if (email) rec.email_id = email;
+    }
+    if (!rec.phone_no) {
+      const phone = extractPhoneFromText(text);
+      if (phone) rec.phone_no = stripSeparators(phone);
+    }
+  }
+
+  // Extract photo from KYC PDF using canvas rendering
+  if (kycPdfObj) {
+    try {
+      const photoDataURL = await extractPhotoFromPDF(kycPdfObj);
+      if (photoDataURL) {
+        rec.photo = 'Photo extracted';
+        rec._photoDataURL = photoDataURL;
+      }
+    } catch (e) {
+      console.warn('Photo extraction failed for', file.name, e);
+    }
+  }
+
+  // Account opening PDF — backstop for PAN, address, opening date
+  if (accOpenPDF) {
+    const buffer = await accOpenPDF.async('arraybuffer');
+    const pdfData = await extractPDFText(buffer);
+    let text = pdfData.text;
+    if ((!text || text.trim().length < 20) && pdfData.pdf) {
+      try {
+        // OCR only the first page — that's where KYC info typically lives.
+        const ocrTexts = [];
+        for (let i = 1; i <= Math.min(pdfData.pdf.numPages, 1); i++) {
+          const page = await pdfData.pdf.getPage(i);
+          const ocrText = await ocrPDFPage(page, 1.5);
+          if (ocrText && ocrText.trim().length > 10) ocrTexts.push(ocrText);
+        }
+        if (ocrTexts.length) text = ocrTexts.join('\n');
+      } catch (e) {}
+    }
+    allPdfTexts.push(text);
+
+    if (!rec.pan_card_no) {
+      const pan = extractPAN(text);
+      if (pan) rec.pan_card_no = pan;
+    }
+    if (!rec.account_opening_date) {
+      const date = extractOpeningDate(text);
+      if (date) rec.account_opening_date = date;
+    }
+    if (!rec.email_id) {
+      const email = extractEmailFromText(text);
+      if (email) rec.email_id = email;
+    }
+  }
+
+  // Other PDFs (e.g., Account Statement) - may contain address for image-based KYC
+  if (otherPDFs.length) {
+    for (const otherEntry of otherPDFs) {
+      try {
+        const buffer = await otherEntry.async('arraybuffer');
+        const pdfData = await extractPDFText(buffer);
+        const text = pdfData.text;
+        allPdfTexts.push(text);
+
+        if (!rec.pan_card_no) {
+          const pan = extractPAN(text);
+          if (pan) rec.pan_card_no = pan;
+        }
+        if (!rec.email_id) {
+          const email = extractEmailFromText(text);
+          if (email) rec.email_id = email;
+        }
+        if (!rec.phone_no) {
+          const phone = extractPhoneFromText(text);
+          if (phone) rec.phone_no = stripSeparators(phone);
+        }
+        if (!rec.account_opening_date) {
+          const date = extractOpeningDate(text);
+          if (date) rec.account_opening_date = date;
+        }
+        // Aadhaar may be in AnyotherDoc (some banks include statement with masked aadhaar)
+        if (!rec.aadhaar_no || rec.aadhaar_no === 'NA') {
+          const aadhaar = extractAadhaar(text);
+          if (aadhaar) rec.aadhaar_no = aadhaar;
+        }
+      } catch (e) {}
+    }
+  }
+
+  // FINAL address pass: collect best address from ALL pdf texts
+  if (allPdfTexts.length) {
+    const bestAddr = extractBestAddress(allPdfTexts);
+    if (bestAddr) {
+      // Prefer the longer/more complete address
+      const currentLen = (rec.complete_address || '').length;
+      if (bestAddr.length > currentLen || currentLen < 20) {
+        rec.complete_address = bestAddr;
+      }
+    }
+  }
+
+  // Fallback: when PDF has no text (scanned images), build address from CSV city + bank location
+  if (!rec.complete_address || rec.complete_address.length < 15) {
+    const parts = [];
+    const seen = new Set();
+    const addPart = (val) => {
+      if (!val) return;
+      const norm = val.toLowerCase().trim();
+      // Skip if duplicate (case-insensitive) or empty
+      if (seen.has(norm)) return;
+      seen.add(norm);
+      parts.push(val);
+    };
+    const csvCity = rec._csvCity || '';
+    // Split city in case it has multiple parts (file 5 has multi-line)
+    const cityParts = csvCity.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+    cityParts.forEach(addPart);
+    if (rec._bankDistrict) addPart(rec._bankDistrict);
+    if (rec._bankState) addPart(rec._bankState);
+    if (rec._bankPIN) addPart(rec._bankPIN);
+    rec.complete_address = parts.join(', ');
+  }
+
+  // Clean up temp fields
+  delete rec._bankDistrict;
+  delete rec._bankState;
+  delete rec._bankPIN;
+  delete rec._csvCity;
+
+  if (!rec.photo) rec.photo = 'Not found';
+
+  return rec;
+}
+
+function updateStats(files, recs, photos, errors) {
+  document.getElementById('statFiles').textContent = files;
+  document.getElementById('statRecords').textContent = recs;
+  document.getElementById('statPhotos').textContent = photos;
+  document.getElementById('statErrors').textContent = errors;
+  statsEl.style.display = 'grid';
+}
+
+function renderResults(filteredRecords) {
+  const dataToRender = filteredRecords || records;
+
+  if (!records.length) {
+    resultsEl.innerHTML = '<div class="empty">No data extracted yet. Upload ZIP files to begin.</div>';
+    searchBar.style.display = 'none';
+    return;
+  }
+
+  if (dataToRender.length === 0) {
+    resultsEl.innerHTML = `<div class="no-results"><strong>No matching records found.</strong><br>Try a different Account No., Phone No., Email ID, or PAN.</div>`;
+    return;
+  }
+
+  const cols = [
+    { key: 'account_holder_name', label: 'Account Holder Name' },
+    { key: 'account_no', label: 'Account No.' },
+    { key: 'complete_address', label: 'Complete Address' },
+    { key: 'phone_no', label: 'Phone No.' },
+    { key: 'pan_card_no', label: 'PAN Card No.' },
+    { key: 'aadhaar_no', label: 'Aadhaar No.' },
+    { key: 'email_id', label: 'Email ID' },
+    { key: 'account_opening_date', label: 'A/C Opening Date' },
+    { key: 'bank_name', label: 'Bank Name' },
+    { key: '_risk', label: 'Risk', isRisk: true },
+    { key: 'ifsc_code', label: 'IFSC Code' },
+    { key: 'branch_email', label: 'Branch Email' },
+    { key: 'branch_phone', label: 'Branch Phone' },
+    { key: '_photoDataURL', label: 'Photo', isPhoto: true },
+  ];
+
+  let html = '<div class="table-wrapper"><table><thead><tr>';
+  cols.forEach(c => html += `<th>${c.label}</th>`);
+  html += '</tr></thead><tbody>';
+
+  // Map records back to indices via stable ID = position in records[]
+  const recordIndices = dataToRender.map(r => records.indexOf(r));
+
+  dataToRender.forEach((r, i) => {
+    const idx = recordIndices[i];
+    html += `<tr class="clickable" data-idx="${idx}">`;
+    cols.forEach(c => {
+      if (c.isPhoto) {
+        html += '<td class="photo-cell">';
+        if (r._photoDataURL) {
+          html += `<img src="${r._photoDataURL}" alt="Photo">`;
+        } else {
+          html += '<div class="photo-placeholder">No photo</div>';
+        }
+        html += '</td>';
+      } else if (c.isRisk) {
+        const level = r._risk ? r._risk.level : 'NA';
+        const score = r._risk ? r._risk.score : '';
+        html += `<td><span class="risk-badge risk-badge--${level}">${level}${score !== '' ? ' ' + score : ''}</span></td>`;
+      } else {
+        const val = r[c.key] || '';
+        let displayVal = escapeHtml(val);
+        if (currentQuery && ['account_no', 'phone_no', 'email_id', 'pan_card_no'].includes(c.key)) {
+          const regex = new RegExp(`(${currentQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+          displayVal = displayVal.replace(regex, '<mark style="background:#fef08a;padding:2px 0;color:#000;">$1</mark>');
+        }
+        html += `<td>${displayVal}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  resultsEl.innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[c]));
+}
+
+// Convert any value to a plain string without scientific notation.
+// Strings stay as strings; numbers are converted to their full decimal
+// representation. This prevents JSON.stringify / Excel from emitting
+// values like "1.23E+15" for very large numeric IDs.
+function toPlainString(v) {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number') {
+    if (!isFinite(v)) return String(v);
+    const s = String(v);
+    if (!/[eE]/.test(s)) return s;
+    // For scientific-notation numbers, expand via toFixed so JSON output
+    // stays in plain decimal form.
+    return v.toFixed(20).replace(/\.?0+$/, '');
+  }
+  if (typeof v === 'boolean') return v ? 'true' : 'false';
+  return String(v);
+}
+
+// JSON.stringify replacer: forces every leaf value to a string so the
+// resulting JSON never contains a raw Number (which JSON would otherwise
+// render in scientific notation for very large values).
+function jsonStringReplacer(_key, value) {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') return value;
+  return toPlainString(value);
+}
+
+function exportData(format) {
+  if (!records.length) {
+    showStatus('No records to export', 'error');
+    return;
+  }
+
+  // Use filtered records if a search is active
+  const exportRecords = currentQuery ?
+    records.filter(r => {
+      const searchFields = [r.account_no || '', r.phone_no || '', r.email_id || '', r.pan_card_no || ''];
+      return searchFields.some(f => f.toLowerCase().includes(currentQuery));
+    }) : records;
+
+  if (!exportRecords.length) {
+    showStatus('No matching records to export', 'error');
+    return;
+  }
+
+  if (format === 'csv') {
+    const headers = ['Account Holder Name', 'Account No.', 'Complete Address',
+                     'Phone No.', 'PAN Card No.', 'Aadhaar No.', 'Email ID', 'A/C Opening Date',
+                     'Bank Name', 'IFSC Code', 'Branch Email', 'Branch Phone', 'Photo'];
+    const keys = ['account_holder_name','account_no','complete_address',
+                  'phone_no','pan_card_no','aadhaar_no','email_id','account_opening_date',
+                  'bank_name','ifsc_code','branch_email','branch_phone','photo'];
+    const rows = [headers.join(',')];
+    exportRecords.forEach(r => {
+      const row = keys.map(k => {
+        const v = toPlainString(r[k]).replace(/"/g, '""');
+        return `"${v}"`;
+      });
+      rows.push(row.join(','));
+    });
+    const csvName = currentQuery ? `account_details_search_${currentQuery.replace(/\W+/g,'_')}.csv` : 'account_details.csv';
+    downloadBlob(new Blob([rows.join('\n')], {type:'text/csv;charset=utf-8;'}),
+                 csvName);
+  } else if (format === 'json') {
+    // Build a JSON-safe payload. Every leaf value is converted to a string
+    // via jsonStringReplacer, so JSON.stringify will never emit numbers in
+    // scientific notation (1e+21) — even if a downstream value slips in
+    // as a Number type.
+    // Strip the internal _photoDataURL field to keep JSON output lean;
+    // base64 photo data is omitted from JSON exports.
+    const cleanRecords = exportRecords.map(r => {
+      const { _photoDataURL, ...rest } = r;
+      return rest;
+    });
+    const payload = {
+      metadata: {
+        exported_at: toPlainString(new Date().toISOString()),
+        total_records: toPlainString(exportRecords.length),
+        source: 'TraceOps',
+        search_query: currentQuery || '',
+        notes: 'All values are strings; no scientific notation is used.'
+      },
+      records: cleanRecords
+    };
+
+    const jsonString = JSON.stringify(payload, jsonStringReplacer, 2);
+    const jsonName = currentQuery
+      ? `account_details_search_${currentQuery.replace(/\W+/g,'_')}.json`
+      : 'account_details.json';
+    downloadBlob(new Blob([jsonString], {type:'application/json;charset=utf-8;'}),
+                 jsonName);
+  } else if (format === 'xlsx') {
+    // Build worksheet with image cells
+    const wsData = [['Account Holder Name', 'Account No.', 'Complete Address',
+                     'Phone No.', 'PAN Card No.', 'Aadhaar No.', 'Email ID', 'A/C Opening Date',
+                     'Bank Name', 'IFSC Code', 'Branch Email', 'Branch Phone', 'Photo']];
+    exportRecords.forEach(r => {
+      wsData.push([
+        r.account_holder_name, r.account_no, r.complete_address,
+        r.phone_no, r.pan_card_no, r.aadhaar_no, r.email_id, r.account_opening_date,
+        r.bank_name, r.ifsc_code, r.branch_email, r.branch_phone,
+        r._photoDataURL ? 'YES (see Photos sheet)' : 'No'
+      ]);
+    });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [
+      {wch:30},{wch:15},{wch:35},{wch:15},{wch:15},{wch:15},{wch:30},
+      {wch:15},{wch:18},{wch:12},{wch:35},{wch:18},{wch:22}
+    ];
+
+    // Force text format on columns that hold numeric-looking IDs so Excel
+    // never displays them in scientific notation (e.g. 1.23E+15). Column
+    // indices (0-based): 2=Account No, 4=Phone, 5=PAN, 6=Aadhaar, 10=IFSC,
+    // 12=Branch Phone. Re-create each affected cell as type 's' with the
+    // '@' text format so Excel keeps the full digit string intact.
+    if (ws['!ref']) {
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      const textFormatCols = [2, 4, 5, 6, 10, 12];
+      for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+        for (const C of textFormatCols) {
+          const addr = XLSX.utils.encode_cell({ r: R, c: C });
+          if (ws[addr]) {
+            ws[addr] = { t: 's', v: toPlainString(ws[addr].v), z: '@' };
+          }
+        }
+      }
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Account Details');
+
+    // Photos sheet — list with image references
+    if (exportRecords.some(r => r._photoDataURL)) {
+      const photoSheet = XLSX.utils.aoa_to_sheet([['Account Holder', 'Account No.', 'PAN', 'Photo']]);
+      let row = 2;
+      exportRecords.forEach(r => {
+        if (r._photoDataURL) {
+          photoSheet[XLSX.utils.encode_cell({r: row-1, c: 0})] = { t: 's', v: r.account_holder_name };
+          photoSheet[XLSX.utils.encode_cell({r: row-1, c: 1})] = { t: 's', v: toPlainString(r.account_no), z: '@' };
+          photoSheet[XLSX.utils.encode_cell({r: row-1, c: 2})] = { t: 's', v: r.pan_card_no };
+          photoSheet[XLSX.utils.encode_cell({r: row-1, c: 3})] = {
+            t: 's', v: r._photoDataURL.length > 32000 ? r._photoDataURL.substring(0,32000) + '...' : r._photoDataURL
+          };
+          row++;
+        }
+      });
+      photoSheet['!cols'] = [{wch:30},{wch:18},{wch:15},{wch:80}];
+      XLSX.utils.book_append_sheet(wb, photoSheet, 'Photos');
+    }
+
+    const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    const xlsxName = currentQuery ? `account_details_search_${currentQuery.replace(/\W+/g,'_')}.xlsx` : 'account_details.xlsx';
+    downloadBlob(new Blob([wbout], {type:'application/octet-stream'}),
+                 xlsxName);
+  }
+  showStatus(`Exported ${exportRecords.length} records as ${format.toUpperCase()}`, 'success');
+}
+
+async function exportRiskReport() {
+  if (!records.length) {
+    showStatus('No records to export', 'error');
+    return;
+  }
+  if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+    showStatus('jsPDF library not loaded — check your internet connection', 'error');
+    return;
+  }
+  const exportRecords = currentQuery ?
+    records.filter(r => {
+      const searchFields = [r.account_no || '', r.phone_no || '', r.email_id || '', r.pan_card_no || ''];
+      return searchFields.some(f => f.toLowerCase().includes(currentQuery));
+    }) : records;
+  if (!exportRecords.length) {
+    showStatus('No matching records to export', 'error');
+    return;
+  }
+  try {
+    if (!analysisRun) {
+      showStatus('Running ML analysis before PDF export…', '');
+      await runMLAnalysis();
+    }
+    await exportRiskReportInternal(exportRecords);
+  } catch (e) {
+    console.error('PDF export failed', e);
+    showStatus('PDF export failed: ' + e.message, 'error');
+  }
+}
+
+async function exportRiskReportInternal(exportRecords) {
+  if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+    showStatus('jsPDF not loaded — check your internet connection', 'error');
+    return;
+  }
+  // Ensure last* collections exist even if analysis wasn't run explicitly
+  if (!lastClusters || typeof lastClusters.clusters === 'undefined') lastClusters = { clusters: [], singletons: [] };
+  if (!lastPatterns) lastPatterns = [];
+  if (!lastDuplicates) lastDuplicates = [];
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const M = 40;
+
+  // Defensive: ensure each record has _risk / _anomalies populated
+  exportRecords.forEach(r => {
+    if (!r._risk) r._risk = { score: 0, level: 'NA', factors: [] };
+    if (!r._anomalies) r._anomalies = [];
+  });
+
+  // Compute risk stats
+  const counts = { LOW: 0, MEDIUM: 0, HIGH: 0, CRITICAL: 0 };
+  exportRecords.forEach(r => { if (r._risk) counts[r._risk.level] = (counts[r._risk.level] || 0) + 1; });
+  const sortedByRisk = [...exportRecords].sort((a, b) => (b._risk ? b._risk.score : 0) - (a._risk ? a._risk.score : 0));
+
+  // ===== COVER PAGE =====
+  doc.setFillColor(10, 14, 39);
+  doc.rect(0, 0, W, H, 'F');
+  doc.setFillColor(255, 0, 170);
+  doc.rect(M, 120, 6, 320, 'F');
+  doc.setTextColor(0, 240, 255);
+  doc.setFontSize(28); doc.setFont('helvetica', 'bold');
+  doc.text('TRACEOPS', M + 20, 160);
+  doc.setTextColor(0, 255, 136);
+  doc.setFontSize(16); doc.setFont('helvetica', 'normal');
+  doc.text('Risk Intelligence Report', M + 20, 190);
+  doc.setTextColor(180, 200, 220);
+  doc.setFontSize(11);
+  doc.text(`Generated: ${new Date().toISOString()}`, M + 20, 230);
+  doc.text(`Total entities: ${exportRecords.length}`, M + 20, 250);
+  if (currentQuery) doc.text(`Search filter: "${currentQuery}"`, M + 20, 270);
+  doc.text(`Report includes risk scoring, anomaly detection,`, M + 20, 320);
+  doc.text(`duplicate analysis, pattern clustering.`, M + 20, 335);
+  doc.setTextColor(120, 130, 150);
+  doc.setFontSize(9);
+  doc.text('CONFIDENTIAL — Generated locally; no data transmitted.', M + 20, H - 40);
+
+  // ===== SUMMARY PAGE =====
+  doc.addPage();
+  doc.setTextColor(0, 240, 255);
+  doc.setFontSize(18); doc.setFont('helvetica', 'bold');
+  doc.text('Executive Summary', M, 60);
+  doc.setDrawColor(0, 240, 255);
+  doc.line(M, 70, W - M, 70);
+
+  doc.setTextColor(50, 50, 50);
+  doc.setFontSize(11); doc.setFont('helvetica', 'normal');
+  let y = 100;
+  const lines = [
+    `Total entities profiled: ${exportRecords.length}`,
+    `Risk distribution:`,
+    `  LOW:      ${counts.LOW}  ${'█'.repeat(Math.min(40, counts.LOW))}`,
+    `  MEDIUM:   ${counts.MEDIUM}  ${'█'.repeat(Math.min(40, counts.MEDIUM))}`,
+    `  HIGH:     ${counts.HIGH}  ${'█'.repeat(Math.min(40, counts.HIGH))}`,
+    `  CRITICAL: ${counts.CRITICAL}  ${'█'.repeat(Math.min(40, counts.CRITICAL))}`,
+    ``,
+    `Anomalies detected: ${lastAnomalies.length}`,
+    `Duplicate groups:    ${lastDuplicates.length}`,
+    `Pattern clusters:    ${lastClusters.clusters.length}`,
+    `Pattern findings:    ${lastPatterns.length}`,
+    ``,
+    `Top 5 highest-risk entities:`
+  ];
+  lines.forEach(line => { doc.text(line, M, y); y += 16; });
+  sortedByRisk.slice(0, 5).forEach(r => {
+    const score = r._risk ? r._risk.score : 0;
+    const level = r._risk ? r._risk.level : 'NA';
+    doc.setTextColor(level === 'CRITICAL' ? 200 : 50, level === 'CRITICAL' ? 40 : 50, level === 'CRITICAL' ? 80 : 50);
+    doc.text(`• ${(r.account_holder_name || '(unnamed)').substring(0, 35)}  [${level} ${score}]`, M + 10, y);
+    y += 14;
+    doc.setTextColor(50, 50, 50);
+  });
+
+  // ===== PER-RECORD PAGES =====
+  for (let idx = 0; idx < exportRecords.length; idx++) {
+    const r = exportRecords[idx];
+    doc.addPage();
+    doc.setTextColor(0, 240, 255);
+    doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+    doc.text(`${idx + 1}. ${(r.account_holder_name || '(unnamed)').substring(0, 45)}`, M, 50);
+    if (r._risk) {
+      const lvl = r._risk.level;
+      const colors = { LOW: [0,150,80], MEDIUM: [180,140,30], HIGH: [200,90,30], CRITICAL: [200,40,80] };
+      doc.setTextColor(...(colors[lvl] || [80,80,80]));
+      doc.setFontSize(11); doc.setFont('helvetica', 'normal');
+      doc.text(`Risk: ${lvl}  |  Score: ${r._risk.score}/100`, W - M - 150, 50);
+    }
+    doc.setDrawColor(0, 240, 255);
+    doc.line(M, 60, W - M, 60);
+
+    doc.setTextColor(40, 40, 40);
+    doc.setFontSize(10);
+    y = 90;
+
+    // ===== PHOTO (top-right, before main content) =====
+    let photoBoxBottom = y;
+    if (r._photoDataURL) {
+      try {
+        // Decode the dataURL into an Image, then into a canvas to get
+        // exact pixel dimensions for proper aspect-ratio fit.
+        const img = await dataURLToImage(r._photoDataURL);
+        if (img) {
+          const boxW = 110, boxH = 140;
+          const boxX = W - M - boxW;
+          const boxY = y - 4;
+          // Cyan border + faint fill to evoke the cyber/HUD aesthetic.
+          doc.setDrawColor(0, 240, 255);
+          doc.setLineWidth(1);
+          doc.rect(boxX, boxY, boxW, boxH);
+          doc.setFillColor(245, 248, 252);
+          doc.rect(boxX + 0.5, boxY + 0.5, boxW - 1, boxH - 1, 'F');
+          // Letterbox-fit the image into the box.
+          const ar = img.width / img.height;
+          let drawW = boxW - 6, drawH = boxH - 6;
+          if (ar > drawW / drawH) drawH = drawW / ar;
+          else drawW = drawH * ar;
+          const drawX = boxX + (boxW - drawW) / 2;
+          const drawY = boxY + (boxH - drawH) / 2;
+          doc.addImage(img, 'JPEG', drawX, drawY, drawW, drawH);
+          photoBoxBottom = boxY + boxH + 8;
+        }
+      } catch (photoErr) {
+        console.warn('Could not embed photo in PDF for', r.account_holder_name, photoErr);
+      }
+    }
+    // Reserve horizontal space for the photo so identity/infra columns
+    // don't run under it.
+    const contentMaxX = r._photoDataURL ? (W - M - 130) : W - M;
+
+    // Two-column layout: identity | infrastructure
+    const identity = [
+      ['Account No.', r.account_no],
+      ['PAN', r.pan_card_no],
+      ['Aadhaar', r.aadhaar_no],
+      ['Phone', r.phone_no],
+      ['Email', r.email_id],
+      ['Opening Date', r.account_opening_date]
+    ];
+    const infra = [
+      ['Bank', r.bank_name],
+      ['IFSC', r.ifsc_code],
+      ['Branch Email', r.branch_email],
+      ['Branch Phone', r.branch_phone],
+      ['Photo', r._photoDataURL ? 'Yes' : 'No'],
+      ['Risk Level', r._risk ? r._risk.level : 'NA']
+    ];
+    doc.setFont('helvetica', 'bold'); doc.text('Identity', M, y);
+    doc.text('Infrastructure', W / 2 + 10, y);
+    doc.setFont('helvetica', 'normal');
+    y += 14;
+    for (let i = 0; i < Math.max(identity.length, infra.length); i++) {
+      if (identity[i]) {
+        doc.setTextColor(100, 100, 100); doc.text(identity[i][0], M, y);
+        doc.setTextColor(20, 20, 20); doc.text((identity[i][1] || '—').toString().substring(0, 35), M + 80, y);
+      }
+      if (infra[i]) {
+        doc.setTextColor(100, 100, 100); doc.text(infra[i][0], W / 2 + 10, y);
+        doc.setTextColor(20, 20, 20); doc.text((infra[i][1] || '—').toString().substring(0, 35), W / 2 + 90, y);
+      }
+      y += 14;
+    }
+
+    // Address
+    y += 10;
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(100, 100, 100);
+    doc.text('Address:', M, y);
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 20, 20);
+    y += 14;
+    const addrLines = doc.splitTextToSize(r.address || r.complete_address || '—', W - 2 * M);
+    addrLines.forEach(line => { doc.text(line, M, y); y += 13; });
+
+    // Risk factors
+    y += 10;
+    // Risk Factors section intentionally omitted from PDF report.
+
+    // Anomalies
+    const cleanAnomalies = (r._anomalies || []).filter(a => !isPdfNoiseAnomaly(a));
+    if (cleanAnomalies.length) {
+      if (y > H - 80) { doc.addPage(); y = 50; }
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(200, 100, 30);
+      doc.text('Anomalies', M, y); y += 14;
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40);
+      cleanAnomalies.forEach(a => {
+        const txt = doc.splitTextToSize(`[${a.type}] ${a.field}: ${a.reasons.join('; ')}`, W - 2 * M - 10);
+        txt.forEach(line => {
+          if (y > H - 50) { doc.addPage(); y = 50; }
+          doc.text(line, M, y); y += 12;
+        });
+      });
+    }
+
+    // Duplicates
+    if (r._duplicateGroup !== null && r._duplicateGroup !== undefined) {
+      const grp = lastDuplicates[r._duplicateGroup];
+      if (grp) {
+        if (y > H - 80) { doc.addPage(); y = 50; }
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(180, 30, 60);
+        doc.text(`Duplicate Group (${grp.confidence})`, M, y); y += 14;
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40);
+        grp.members.forEach(i => {
+          if (y > H - 50) { doc.addPage(); y = 50; }
+          const peer = exportRecords[i] || records[i];
+doc.text(`• ${(peer ? peer.account_holder_name : `#${i}`)} (${peer ? peer.account_no : '?'})`, M + 10, y);
+          y += 12;
+        });
+      }
+    }
+  }
+
+  // ===== APPENDIX: CLUSTERS =====
+  if (lastClusters.clusters.length) {
+    doc.addPage();
+    doc.setTextColor(0, 240, 255);
+    doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+    doc.text('Appendix A — Similar-Entity Clusters', M, 50);
+    doc.setDrawColor(0, 240, 255);
+    doc.line(M, 60, W - M, 60);
+    doc.setTextColor(40, 40, 40);
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+    y = 90;
+    lastClusters.clusters.forEach(c => {
+      if (y > H - 60) { doc.addPage(); y = 50; }
+      doc.setFont('helvetica', 'bold'); doc.text(`Cluster #${c.id} (${c.size} members)`, M, y); y += 14;
+      doc.setFont('helvetica', 'normal');
+      c.records.forEach(idx => {
+        const peer = exportRecords[idx] || records[idx];
+        doc.text(`• ${(peer ? peer.account_holder_name : `#${idx}`)} (${peer ? peer.account_no : '?'})`, M + 10, y);
+        y += 12;
+      });
+      y += 6;
+    });
+  }
+
+  // ===== APPENDIX: PATTERNS =====
+  if (lastPatterns.length) {
+    doc.addPage();
+    doc.setTextColor(0, 240, 255);
+    doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+    doc.text('Appendix B — Temporal / Infrastructure Patterns', M, 50);
+    doc.setDrawColor(0, 240, 255);
+    doc.line(M, 60, W - M, 60);
+    doc.setTextColor(40, 40, 40);
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+    y = 90;
+    lastPatterns.forEach(p => {
+      if (y > H - 50) { doc.addPage(); y = 50; }
+      doc.setFont('helvetica', 'bold'); doc.text(`${p.kind.toUpperCase()}: ${p.key}`, M, y); y += 14;
+      doc.setFont('helvetica', 'normal');
+      const txt = doc.splitTextToSize(p.note, W - 2 * M - 10);
+      txt.forEach(line => { doc.text(line, M, y); y += 12; });
+      y += 6;
+    });
+  }
+
+  // Filename
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+  const fname = currentQuery
+    ? `traceops_risk_report_${currentQuery.replace(/\W+/g, '_')}_${ts}.pdf`
+    : `traceops_risk_report_${ts}.pdf`;
+  try {
+    doc.save(fname);
+    showStatus(`Exported ${exportRecords.length} entities to PDF`, 'success');
+  } catch (saveErr) {
+    console.error('PDF save failed', saveErr);
+    // Fallback: blob URL download
+    try {
+      const blob = doc.output('blob');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fname; document.body.appendChild(a);
+      a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+      showStatus(`Exported ${exportRecords.length} entities to PDF`, 'success');
+    } catch (fallbackErr) {
+      console.error('PDF fallback save failed', fallbackErr);
+      showStatus('PDF export failed: ' + fallbackErr.message, 'error');
+    }
+  }
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ========== INIT ==========
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initThreeBackground);
+} else {
+  initThreeBackground();
+}
+</script>
+</body>
+</html>
